@@ -1,5 +1,3 @@
-package au.com.cathis.plugin.message.immobilize;
-
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaPlugin;
 import org.json.JSONArray;
@@ -10,65 +8,62 @@ import android.content.Context;
 import android.content.Intent;
 import android.location.LocationManager;
 import android.util.Log;
+import org.json.JSONObject;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class ImmobilizePlugin extends CordovaPlugin {
+
     private static final String TAG = "ImmobilizePlugin";
+
+    public static final String ACTION_UPDATE = "update";
+    public static final String ACTION_STOP_UPDATE = "stopUpdate";
+    public static final String ACTION_WATCH_IMMOBILISE = "watchImmobilise";
+    public static final String ACTION_STOP_WATCH = "stopWatch";
+
+    private Intent updateServiceIntent;
+    private Intent watchServiceIntent;
+    private Boolean isUpdateEnabled = false;
+    private Boolean isWatchingEnabled = false;
 
     public boolean execute(String action, JSONArray data, CallbackContext callbackContext) {
         Activity activity = this.cordova.getActivity();
         Boolean result = false;
-        updateServiceIntent = new Intent(activity, LocationUpdateService.class);
+        updateServiceIntent = new Intent(activity, PositionUpdateService.class);
 
-        if (ACTION_START.equalsIgnoreCase(action) && !isEnabled) {
-            result = true;
-            if (params == null || headers == null || url == null) {
-                callbackContext.error("Call configure before calling start");
-            } else {
+        if (ACTION_UPDATE.equalsIgnoreCase(action)) {
+            if(!isUpdateEnabled){
+                callbackContext.error("Position Updates already enabled.");
+            }else{
                 callbackContext.success();
-                updateServiceIntent.putExtra("url", url);
-                updateServiceIntent.putExtra("params", params);
-                updateServiceIntent.putExtra("headers", headers);
-                updateServiceIntent.putExtra("stationaryRadius", stationaryRadius);
-                updateServiceIntent.putExtra("desiredAccuracy", desiredAccuracy);
-                updateServiceIntent.putExtra("distanceFilter", distanceFilter);
-                updateServiceIntent.putExtra("locationTimeout", locationTimeout);
-                updateServiceIntent.putExtra("desiredAccuracy", desiredAccuracy);
-                updateServiceIntent.putExtra("isDebugging", isDebugging);
-                updateServiceIntent.putExtra("notificationTitle", notificationTitle);
-                updateServiceIntent.putExtra("notificationText", notificationText);
-                updateServiceIntent.putExtra("stopOnTerminate", stopOnTerminate);
+                try{
 
-                activity.startService(updateServiceIntent);
-                isEnabled = true;
+                    JSONObject postParameters = new JSONObject();
+                    postParameters.put("accessToken", data.getString(2));
+
+                    updateServiceIntent.putExtra("url", data.getString(1));
+                    updateServiceIntent.putExtra("params", postParameters.toString());
+                    //updateServiceIntent.putExtra("headers", new JSONObject().toString());
+                    //updateServiceIntent.putExtra("stationaryRadius", 50);
+                    updateServiceIntent.putExtra("movingAccuracy", data.getString(0));
+                    //updateServiceIntent.putExtra("distanceFilter", distanceFilter);
+                    //updateServiceIntent.putExtra("locationTimeout", locationTimeout);
+                    //updateServiceIntent.putExtra("isDebugging", isDebugging);
+                    //updateServiceIntent.putExtra("notificationTitle", notificationTitle);
+                    //updateServiceIntent.putExtra("notificationText", notificationText);
+                    //updateServiceIntent.putExtra("stopOnTerminate", stopOnTerminate);
+
+                    activity.startService(updateServiceIntent);
+                    isUpdateEnabled = true;
+
+                }catch (JSONException ex){
+                    callbackContext.error("Could not parse the provided parameters to this action. Error: "+ex.getMessage());
+                }
             }
-        } else if (ACTION_STOP.equalsIgnoreCase(action)) {
-            isEnabled = false;
-            result = true;
+        } else if (ACTION_STOP_UPDATE.equalsIgnoreCase(action)) {
+            isUpdateEnabled = false;
             activity.stopService(updateServiceIntent);
-            callbackContext.success();
-        } else if (ACTION_CONFIGURE.equalsIgnoreCase(action)) {
-            result = true;
-            try {
-                // Params.
-                //    0       1       2           3               4                5               6            7           8                9               10              11
-                //[params, headers, url, stationaryRadius, distanceFilter, locationTimeout, desiredAccuracy, debug, notificationTitle, notificationText, activityType, stopOnTerminate]
-                this.params = data.getString(0);
-                this.headers = data.getString(1);
-                this.url = data.getString(2);
-                this.stationaryRadius = data.getString(3);
-                this.distanceFilter = data.getString(4);
-                this.locationTimeout = data.getString(5);
-                this.desiredAccuracy = data.getString(6);
-                this.isDebugging = data.getString(7);
-                this.notificationTitle = data.getString(8);
-                this.notificationText = data.getString(9);
-                this.stopOnTerminate = data.getString(11);
-            } catch (JSONException e) {
-                callbackContext.error("authToken/url required as parameters: " + e.getMessage());
-            }
-        } else if (ACTION_SET_CONFIG.equalsIgnoreCase(action)) {
-            result = true;
-            // TODO reconfigure Service
             callbackContext.success();
         }
 
@@ -81,9 +76,6 @@ public class ImmobilizePlugin extends CordovaPlugin {
      */
     public void onDestroy() {
         Activity activity = this.cordova.getActivity();
-
-        if(isEnabled && stopOnTerminate.equalsIgnoreCase("true")) {
-            activity.stopService(updateServiceIntent);
-        }
+        activity.stopService(updateServiceIntent);
     }
 }
