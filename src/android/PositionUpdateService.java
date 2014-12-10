@@ -6,17 +6,19 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.location.Criteria;
-import android.location.LocationListener;
-import android.location.LocationManager;
+import android.location.*;
+import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.*;
 import android.telephony.CellLocation;
 import android.telephony.PhoneStateListener;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.widget.Toast;
+import au.com.cathis.plugin.message.immobilize.data.DAOFactory;
+import au.com.cathis.plugin.message.immobilize.data.LocationDAO;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
@@ -28,17 +30,18 @@ import java.util.Iterator;
 import java.util.List;
 
 import static java.lang.Math.*;
+import static java.lang.Math.abs;
 
 public class PositionUpdateService extends Service implements LocationListener {
 
     private static final String TAG = "PositionUpdateService";
-    private static final String STATIONARY_REGION_ACTION = "au.com.cathis.plugin.message.immobilize.bgloc.STATIONARY_REGION_ACTION";
-    private static final String STATIONARY_LOCATION_MONITOR_ACTION = "au.com.cathis.plugin.message.immobilize.bgloc.STATIONARY_LOCATION_MONITOR_ACTION";
-    private static final String STATIONARY_ALARM_ACTION = "au.com.cathis.plugin.message.immobilize.bgloc.STATIONARY_LOCATION_MONITOR_ACTION";
-    private static final String SINGLE_LOCATION_UPDATE_ACTION = "au.com.cathis.plugin.message.immobilize.bgloc.SINGLE_LOCATION_UPDATE_ACTION";
-    private static final long STATIONARY_TIMEOUT = 5 * 1000 * 60;    // 5 minutes.
-    private static final long STATIONARY_LOCATION_POLLING_INTERVAL_LAZY = 3 * 1000 * 60;    // 3 minutes.
-    private static final long STATIONARY_LOCATION_POLLING_INTERVAL_AGGRESSIVE = 1 * 1000 * 60;    // 1 minute.
+    private static final String STATIONARY_REGION_ACTION        = "au.com.cathis.plugin.message.immobilize.STATIONARY_REGION_ACTION";
+    private static final String STATIONARY_ALARM_ACTION         = "au.com.cathis.plugin.message.immobilize.STATIONARY_ALARM_ACTION";
+    private static final String SINGLE_LOCATION_UPDATE_ACTION   = "au.com.cathis.plugin.message.immobilize.SINGLE_LOCATION_UPDATE_ACTION";
+    private static final String STATIONARY_LOCATION_MONITOR_ACTION = "au.com.cathis.plugin.message.immobilize.STATIONARY_LOCATION_MONITOR_ACTION";
+    private static final long STATIONARY_TIMEOUT                                = 5 * 1000 * 60;    // 5 minutes.
+    private static final long STATIONARY_LOCATION_POLLING_INTERVAL_LAZY         = 3 * 1000 * 60;    // 3 minutes.
+    private static final long STATIONARY_LOCATION_POLLING_INTERVAL_AGGRESSIVE   = 1 * 1000 * 60;    // 1 minute.
     private static final Integer MAX_STATIONARY_ACQUISITION_ATTEMPTS = 5;
     private static final Integer MAX_SPEED_ACQUISITION_ATTEMPTS = 3;
 
@@ -47,25 +50,32 @@ public class PositionUpdateService extends Service implements LocationListener {
     private long lastUpdateTime = 0l;
 
     private JSONObject params;
-    private JSONObject headers = new JSONObject();
-    private String apiUrl;
+    private JSONObject headers;
+    private String url;
 
-    private Boolean isMoving = false;
-    private Boolean isAcquiringStationaryLocation = false;
-    private Boolean isAcquiringSpeed = false;
-    private Integer locationAcquisitionAttempts = 0;
-
-    private float movingAccuracy;
+    private float stationaryRadius;
     private android.location.Location stationaryLocation;
     private PendingIntent stationaryAlarmPI;
     private PendingIntent stationaryLocationPollingPI;
     private long stationaryLocationPollingInterval;
     private PendingIntent stationaryRegionPI;
     private PendingIntent singleUpdatePI;
-    private Integer locationTimeout = 30;
 
+    private Boolean isMoving = false;
+    private Boolean isAcquiringStationaryLocation = false;
+    private Boolean isAcquiringSpeed = false;
+    private Integer locationAcquisitionAttempts = 0;
+
+    private Integer desiredAccuracy = 100;
+    private Integer distanceFilter = 30;
+    private Integer scaledDistanceFilter;
+    private Integer locationTimeout = 30;
+    private Boolean isDebugging;
     private String notificationTitle = "Background checking";
     private String notificationText = "ENABLED";
+    private Boolean stopOnTerminate;
+
+    private ToneGenerator toneGenerator;
 
     private Criteria criteria;
 
@@ -73,9 +83,11 @@ public class PositionUpdateService extends Service implements LocationListener {
     private AlarmManager alarmManager;
     private ConnectivityManager connectivityManager;
     private NotificationManager notificationManager;
+    public static TelephonyManager telephonyManager = null;
 
     @Override
     public IBinder onBind(Intent intent) {
+        // TODO Auto-generated method stub
         Log.i(TAG, "OnBind" + intent);
         return null;
     }
@@ -84,29 +96,37 @@ public class PositionUpdateService extends Service implements LocationListener {
     public void onCreate() {
         super.onCreate();
         Log.i(TAG, "OnCreate");
-        android.os.Debug.waitForDebugger();
-        locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
-        alarmManager = (AlarmManager) this.getSystemService(Context.ALARM_SERVICE);
-        connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        notificationManager = (NotificationManager) this.getSystemService(Context.NOTIFICATION_SERVICE);
+
+        locationManager         = (LocationManager)this.getSystemService(Context.LOCATION_SERVICE);
+        alarmManager            = (AlarmManager) this.getSystemService(Context.ALARM_SERVICE);
+        toneGenerator           = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100);
+        connectivityManager     = (ConnectivityManager)getSystemService(Context.CONNECTIVITY_SERVICE);
+        notificationManager     = (NotificationManager)this.getSystemService(Context.NOTIFICATION_SERVICE);
+        telephonyManager        = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
 
         // Stop-detection PI
-        stationaryAlarmPI = PendingIntent.getBroadcast(this, 0, new Intent(STATIONARY_ALARM_ACTION), 0);
+        stationaryAlarmPI   = PendingIntent.getBroadcast(this, 0, new Intent(STATIONARY_ALARM_ACTION), 0);
         registerReceiver(stationaryAlarmReceiver, new IntentFilter(STATIONARY_ALARM_ACTION));
 
         // Stationary region PI
-        stationaryRegionPI = PendingIntent.getBroadcast(this, 0, new Intent(STATIONARY_REGION_ACTION), PendingIntent.FLAG_CANCEL_CURRENT);
+        stationaryRegionPI  = PendingIntent.getBroadcast(this, 0, new Intent(STATIONARY_REGION_ACTION), PendingIntent.FLAG_CANCEL_CURRENT);
         registerReceiver(stationaryRegionReceiver, new IntentFilter(STATIONARY_REGION_ACTION));
 
         // Stationary location monitor PI
         stationaryLocationPollingPI = PendingIntent.getBroadcast(this, 0, new Intent(STATIONARY_LOCATION_MONITOR_ACTION), 0);
         registerReceiver(stationaryLocationMonitorReceiver, new IntentFilter(STATIONARY_LOCATION_MONITOR_ACTION));
 
-        // One-shot PI
+        // One-shot PI (TODO currently unused)
         singleUpdatePI = PendingIntent.getBroadcast(this, 0, new Intent(SINGLE_LOCATION_UPDATE_ACTION), PendingIntent.FLAG_CANCEL_CURRENT);
         registerReceiver(singleUpdateReceiver, new IntentFilter(SINGLE_LOCATION_UPDATE_ACTION));
 
-        PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+        ////
+        // DISABLED
+        // Listen to Cell-tower switches (NOTE does not operate while suspended)
+        //telephonyManager.listen(phoneStateListener, LISTEN_CELL_LOCATION);
+        //
+
+        PowerManager pm         = (PowerManager) getSystemService(Context.POWER_SERVICE);
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TAG);
 
         wakeLock.acquire();
@@ -125,18 +145,25 @@ public class PositionUpdateService extends Service implements LocationListener {
         if (intent != null) {
             try {
                 params = new JSONObject(intent.getStringExtra("params"));
+                headers = new JSONObject(intent.getStringExtra("headers"));
             } catch (JSONException e) {
+                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
-            apiUrl = intent.getStringExtra("apiUrl");
-            movingAccuracy = Integer.parseInt(intent.getStringExtra("movingAccuracy"));
-            //notificationTitle = intent.getStringExtra("notificationTitle");
-            //notificationText = intent.getStringExtra("notificationText");
+            url = intent.getStringExtra("url");
+            stationaryRadius = Float.parseFloat(intent.getStringExtra("stationaryRadius"));
+            distanceFilter = Integer.parseInt(intent.getStringExtra("distanceFilter"));
+            scaledDistanceFilter = distanceFilter;
+            desiredAccuracy = Integer.parseInt(intent.getStringExtra("desiredAccuracy"));
+            locationTimeout = Integer.parseInt(intent.getStringExtra("locationTimeout"));
+            isDebugging = Boolean.parseBoolean(intent.getStringExtra("isDebugging"));
+            notificationTitle = intent.getStringExtra("notificationTitle");
+            notificationText = intent.getStringExtra("notificationText");
 
             // Build a Notification required for running service in foreground.
             Intent main = new Intent(this, ImmobilizePlugin.class);
             main.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, main, PendingIntent.FLAG_UPDATE_CURRENT);
+            PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, main,  PendingIntent.FLAG_UPDATE_CURRENT);
 
             Notification.Builder builder = new Notification.Builder(this);
             builder.setContentTitle(notificationTitle);
@@ -144,7 +171,7 @@ public class PositionUpdateService extends Service implements LocationListener {
             builder.setSmallIcon(android.R.drawable.ic_menu_mylocation);
             builder.setContentIntent(pendingIntent);
             Notification notification;
-            if (Build.VERSION.SDK_INT >= 16) {
+            if (android.os.Build.VERSION.SDK_INT >= 16) {
                 notification = buildForegroundNotification(builder);
             } else {
                 notification = buildForegroundNotificationCompat(builder);
@@ -152,11 +179,16 @@ public class PositionUpdateService extends Service implements LocationListener {
             notification.flags |= Notification.FLAG_ONGOING_EVENT | Notification.FLAG_FOREGROUND_SERVICE | Notification.FLAG_NO_CLEAR;
             startForeground(startId, notification);
         }
-        Log.i(TAG, "- apiUrl: " + apiUrl);
+        Log.i(TAG, "- url: " + url);
         Log.i(TAG, "- params: " + params.toString());
-        Log.i(TAG, "- movingAccuracy: " + movingAccuracy);
-        Log.i(TAG, "- notificationTitle: " + notificationTitle);
-        Log.i(TAG, "- notificationText: " + notificationText);
+        Log.i(TAG, "- headers: " + headers.toString());
+        Log.i(TAG, "- stationaryRadius: "   + stationaryRadius);
+        Log.i(TAG, "- distanceFilter: "     + distanceFilter);
+        Log.i(TAG, "- desiredAccuracy: "    + desiredAccuracy);
+        Log.i(TAG, "- locationTimeout: "    + locationTimeout);
+        Log.i(TAG, "- isDebugging: "        + isDebugging);
+        Log.i(TAG, "- notificationTitle: "  + notificationTitle);
+        Log.i(TAG, "- notificationText: "   + notificationText);
 
         this.setPace(false);
 
@@ -179,26 +211,29 @@ public class PositionUpdateService extends Service implements LocationListener {
     public boolean stopService(Intent intent) {
         Log.i(TAG, "- Received stop: " + intent);
         cleanUp();
+        if (isDebugging) {
+            Toast.makeText(this, "Background location tracking stopped", Toast.LENGTH_SHORT).show();
+        }
         return super.stopService(intent);
     }
 
     /**
+     *
      * @param value set true to engage "aggressive", battery-consuming tracking, false for stationary-region tracking
      */
     private void setPace(Boolean value) {
-
         Log.i(TAG, "setPace: " + value);
 
-        Boolean wasMoving = isMoving;
-        isMoving = value;
+        Boolean wasMoving   = isMoving;
+        isMoving            = value;
         isAcquiringStationaryLocation = false;
-        isAcquiringSpeed = false;
-        stationaryLocation = null;
+        isAcquiringSpeed    = false;
+        stationaryLocation  = null;
 
         locationManager.removeUpdates(this);
 
         criteria.setAccuracy(Criteria.ACCURACY_FINE);
-        criteria.setHorizontalAccuracy(Criteria.ACCURACY_MEDIUM);
+        criteria.setHorizontalAccuracy(translateDesiredAccuracy(desiredAccuracy));
         criteria.setPowerRequirement(Criteria.POWER_HIGH);
 
         if (isMoving) {
@@ -215,26 +250,50 @@ public class PositionUpdateService extends Service implements LocationListener {
             locationAcquisitionAttempts = 0;
             // Turn on each provider aggressively for a short period of time
             List<String> matchingProviders = locationManager.getAllProviders();
-            for (String provider : matchingProviders) {
+            for (String provider: matchingProviders) {
                 if (provider != LocationManager.PASSIVE_PROVIDER) {
                     locationManager.requestLocationUpdates(provider, 0, 0, this);
                 }
             }
         } else {
-            locationManager.requestLocationUpdates(locationManager.getBestProvider(criteria, true), locationTimeout * 1000, 30, this);
+            locationManager.requestLocationUpdates(locationManager.getBestProvider(criteria, true), locationTimeout*1000, scaledDistanceFilter, this);
         }
+    }
+
+    /**
+     * Translates a number representing desired accuracy of GeoLocation system from set [0, 10, 100, 1000].
+     * 0:  most aggressive, most accurate, worst battery drain
+     * 1000:  least aggressive, least accurate, best for battery.
+     */
+    private Integer translateDesiredAccuracy(Integer accuracy) {
+        switch (accuracy) {
+            case 1000:
+                accuracy = Criteria.ACCURACY_LOW;
+                break;
+            case 100:
+                accuracy = Criteria.ACCURACY_MEDIUM;
+                break;
+            case 10:
+                accuracy = Criteria.ACCURACY_HIGH;
+                break;
+            case 0:
+                accuracy = Criteria.ACCURACY_HIGH;
+                break;
+            default:
+                accuracy = Criteria.ACCURACY_MEDIUM;
+        }
+        return accuracy;
     }
 
     /**
      * Returns the most accurate and timely previously detected location.
      * Where the last result is beyond the specified maximum distance or
-     * latency a one-off location update is returned via the {@link android.location.LocationListener}
-     *
+     * latency a one-off location update is returned via the {@link LocationListener}
      * @return The most accurate and / or timely previously detected location.
      */
     public android.location.Location getLastBestLocation() {
-        int minDistance = (int) movingAccuracy;
-        long minTime = System.currentTimeMillis() - (locationTimeout * 1000);
+        int minDistance = (int) stationaryRadius;
+        long minTime    = System.currentTimeMillis() - (locationTimeout * 1000);
 
         Log.i(TAG, "- fetching last best location " + minDistance + "," + minTime);
         android.location.Location bestResult = null;
@@ -245,7 +304,7 @@ public class PositionUpdateService extends Service implements LocationListener {
         // note of the most accurate result within the acceptable time limit.
         // If no result is found within maxTime, return the newest Location.
         List<String> matchingProviders = locationManager.getAllProviders();
-        for (String provider : matchingProviders) {
+        for (String provider: matchingProviders) {
             Log.d(TAG, "- provider: " + provider);
             android.location.Location location = locationManager.getLastKnownLocation(provider);
             if (location != null) {
@@ -266,11 +325,14 @@ public class PositionUpdateService extends Service implements LocationListener {
     public void onLocationChanged(android.location.Location location) {
         Log.d(TAG, "- onLocationChanged: " + location.getLatitude() + "," + location.getLongitude() + ", accuracy: " + location.getAccuracy() + ", isMoving: " + isMoving + ", speed: " + location.getSpeed());
 
-        if (!isMoving) {
+        if (!isMoving && !isAcquiringStationaryLocation && stationaryLocation==null) {
             // Perhaps our GPS signal was interupted, re-acquire a stationaryLocation now.
             setPace(false);
         }
 
+        if (isDebugging) {
+            Toast.makeText(this, "mv:"+isMoving+",acy:"+location.getAccuracy()+",v:"+location.getSpeed()+",df:"+scaledDistanceFilter, Toast.LENGTH_LONG).show();
+        }
         if (isAcquiringStationaryLocation) {
             if (stationaryLocation == null || stationaryLocation.getAccuracy() > location.getAccuracy()) {
                 stationaryLocation = location;
@@ -278,41 +340,100 @@ public class PositionUpdateService extends Service implements LocationListener {
             if (++locationAcquisitionAttempts == MAX_STATIONARY_ACQUISITION_ATTEMPTS) {
                 isAcquiringStationaryLocation = false;
                 startMonitoringStationaryRegion(stationaryLocation);
+                if (isDebugging) {
+                    startTone("long_beep");
+                }
             } else {
                 // Unacceptable stationary-location: bail-out and wait for another.
+                if (isDebugging) {
+                    startTone("beep");
+                }
                 return;
             }
         } else if (isAcquiringSpeed) {
             if (++locationAcquisitionAttempts == MAX_SPEED_ACQUISITION_ATTEMPTS) {
                 // Got enough samples, assume we're confident in reported speed now.  Play "woohoo" sound.
+                if (isDebugging) {
+                    startTone("doodly_doo");
+                }
                 isAcquiringSpeed = false;
+                scaledDistanceFilter = calculateDistanceFilter(location.getSpeed());
                 setPace(true);
             } else {
+                if (isDebugging) {
+                    startTone("beep");
+                }
                 return;
             }
         } else if (isMoving) {
+            if (isDebugging) {
+                startTone("beep");
+            }
             // Only reset stationaryAlarm when accurate speed is detected, prevents spurious locations from resetting when stopped.
-            if ((location.getSpeed() >= 1) && (location.getAccuracy() <= movingAccuracy)) {
+            if ( (location.getSpeed() >= 1) && (location.getAccuracy() <= stationaryRadius) ) {
                 resetStationaryAlarm();
+            }
+            // Calculate latest distanceFilter, if it changed by 5 m/s, we'll reconfigure our pace.
+            Integer newDistanceFilter = calculateDistanceFilter(location.getSpeed());
+            if (newDistanceFilter != scaledDistanceFilter.intValue()) {
+                Log.i(TAG, "- updated distanceFilter, new: " + newDistanceFilter + ", old: " + scaledDistanceFilter);
+                scaledDistanceFilter = newDistanceFilter;
+                setPace(true);
+            }
+            if (location.distanceTo(lastLocation) < distanceFilter) {
+                return;
             }
         } else if (stationaryLocation != null) {
             return;
         }
         // Go ahead and cache, push to server
         lastLocation = location;
-        postLocation(location);
+        persistLocation(location);
 
         if (this.isNetworkConnected()) {
             Log.d(TAG, "Scheduling location network post");
-            //schedulePostLocations();
+            schedulePostLocations();
         } else {
-            Log.d(TAG, "Network unavailable, sending now.");
+            Log.d(TAG, "Network unavailable, waiting for now");
         }
+    }
+
+    /**
+     * Plays debug sound
+     * @param name
+     */
+    private void startTone(String name) {
+        int tone = 0;
+        int duration = 1000;
+
+        if (name.equals("beep")) {
+            tone = ToneGenerator.TONE_PROP_BEEP;
+        } else if (name.equals("beep_beep_beep")) {
+            tone = ToneGenerator.TONE_CDMA_CONFIRM;
+        } else if (name.equals("long_beep")) {
+            tone = ToneGenerator.TONE_CDMA_ABBR_ALERT;
+        } else if (name.equals("doodly_doo")) {
+            tone = ToneGenerator.TONE_CDMA_ALERT_NETWORK_LITE;
+        } else if (name.equals("chirp_chirp_chirp")) {
+            tone = ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD;
+        } else if (name.equals("dialtone")) {
+            tone = ToneGenerator.TONE_SUP_RINGTONE;
+        }
+        toneGenerator.startTone(tone, duration);
     }
 
     public void resetStationaryAlarm() {
         alarmManager.cancel(stationaryAlarmPI);
         alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + STATIONARY_TIMEOUT, stationaryAlarmPI); // Millisec * Second * Minute
+    }
+
+    private Integer calculateDistanceFilter(Float speed) {
+        Double newDistanceFilter = (double) distanceFilter;
+        if (speed < 100) {
+            float roundedDistanceFilter = (round(speed / 5) * 5);
+            newDistanceFilter = pow(roundedDistanceFilter, 2) + (double) distanceFilter;
+        }
+        return (newDistanceFilter.intValue() < 1000) ? newDistanceFilter.intValue() : 1000;
     }
 
     private void startMonitoringStationaryRegion(android.location.Location location) {
@@ -325,8 +446,8 @@ public class PositionUpdateService extends Service implements LocationListener {
         locationManager.addProximityAlert(
                 location.getLatitude(),
                 location.getLongitude(),
-                (location.getAccuracy() < movingAccuracy) ? movingAccuracy : location.getAccuracy(),
-                (long) -1,
+                (location.getAccuracy() < stationaryRadius) ? stationaryRadius : location.getAccuracy(),
+                (long)-1,
                 stationaryRegionPI
         );
 
@@ -346,10 +467,19 @@ public class PositionUpdateService extends Service implements LocationListener {
         if (isMoving) {
             return;
         }
+        if (isDebugging) {
+            startTone("beep");
+        }
         float distance = abs(location.distanceTo(stationaryLocation) - stationaryLocation.getAccuracy() - location.getAccuracy());
 
+        if (isDebugging) {
+            Toast.makeText(this, "Stationary exit in " + (stationaryRadius-distance) + "m", Toast.LENGTH_LONG).show();
+        }
+
+        // TODO http://www.cse.buffalo.edu/~demirbas/publications/proximity.pdf
+        // determine if we're almost out of stationary-distance and increase monitoring-rate.
         Log.i(TAG, "- distance from stationary location: " + distance);
-        if (distance > movingAccuracy) {
+        if (distance > stationaryRadius) {
             onExitStationaryRegion(location);
         } else if (distance > 0) {
             startPollingStationaryLocation(STATIONARY_LOCATION_POLLING_INTERVAL_AGGRESSIVE);
@@ -357,12 +487,14 @@ public class PositionUpdateService extends Service implements LocationListener {
             startPollingStationaryLocation(STATIONARY_LOCATION_POLLING_INTERVAL_LAZY);
         }
     }
-
     /**
      * User has exit his stationary region!  Initiate aggressive geolocation!
      */
     public void onExitStationaryRegion(android.location.Location location) {
-
+        // Filter-out spurious region-exits:  must have at least a little speed to move out of stationary-region
+        if (isDebugging) {
+            startTone("beep_beep_beep");
+        }
         // Cancel the periodic stationary location monitor alarm.
         alarmManager.cancel(stationaryLocationPollingPI);
 
@@ -374,13 +506,30 @@ public class PositionUpdateService extends Service implements LocationListener {
     }
 
     /**
+     * TODO Experimental cell-tower change system; something like ios significant changes.
+     */
+    public void onCellLocationChange(CellLocation cellLocation) {
+        Log.i(TAG, "- onCellLocationChange" + cellLocation.toString());
+        if (isDebugging) {
+            Toast.makeText(this, "Cellular location change", Toast.LENGTH_LONG).show();
+            startTone("chirp_chirp_chirp");
+        }
+        if (!isMoving && stationaryLocation != null) {
+            criteria.setAccuracy(Criteria.ACCURACY_FINE);
+            criteria.setHorizontalAccuracy(Criteria.ACCURACY_HIGH);
+            criteria.setPowerRequirement(Criteria.POWER_HIGH);
+            locationManager.requestSingleUpdate(criteria, singleUpdatePI);
+        }
+    }
+
+    /**
      * Broadcast receiver for receiving a single-update from LocationManager.
      */
     private BroadcastReceiver singleUpdateReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             String key = LocationManager.KEY_LOCATION_CHANGED;
-            android.location.Location location = (android.location.Location) intent.getExtras().get(key);
+            android.location.Location location = (android.location.Location)intent.getExtras().get(key);
             if (location != null) {
                 Log.d(TAG, "- singleUpdateReciever" + location.toString());
                 onPollStationaryLocation(location);
@@ -393,7 +542,8 @@ public class PositionUpdateService extends Service implements LocationListener {
      */
     private BroadcastReceiver stationaryAlarmReceiver = new BroadcastReceiver() {
         @Override
-        public void onReceive(Context context, Intent intent) {
+        public void onReceive(Context context, Intent intent)
+        {
             Log.i(TAG, "- stationaryAlarm fired");
             setPace(false);
         }
@@ -405,9 +555,12 @@ public class PositionUpdateService extends Service implements LocationListener {
      */
     private BroadcastReceiver stationaryLocationMonitorReceiver = new BroadcastReceiver() {
         @Override
-        public void onReceive(Context context, Intent intent) {
+        public void onReceive(Context context, Intent intent)
+        {
             Log.i(TAG, "- stationaryLocationMonitorReceiver fired");
-
+            if (isDebugging) {
+                startTone("dialtone");
+            }
             criteria.setAccuracy(Criteria.ACCURACY_FINE);
             criteria.setHorizontalAccuracy(Criteria.ACCURACY_HIGH);
             criteria.setPowerRequirement(Criteria.POWER_HIGH);
@@ -429,7 +582,8 @@ public class PositionUpdateService extends Service implements LocationListener {
                 if (isMoving) {
                     setPace(false);
                 }
-            } else {
+            }
+            else {
                 Log.d(TAG, "- EXIT");
                 // There MUST be a valid, recent location if this event-handler was called.
                 android.location.Location location = getLastBestLocation();
@@ -439,23 +593,41 @@ public class PositionUpdateService extends Service implements LocationListener {
             }
         }
     };
+    /**
+     * TODO Experimental, hoping to implement some sort of "significant changes" system here like ios based upon cell-tower changes.
+     */
+    private PhoneStateListener phoneStateListener = new PhoneStateListener() {
+        @Override
+        public void onCellLocationChanged(CellLocation location)
+        {
+            onCellLocationChange(location);
+        }
+    };
 
     public void onProviderDisabled(String provider) {
+        // TODO Auto-generated method stub
         Log.d(TAG, "- onProviderDisabled: " + provider);
     }
-
     public void onProviderEnabled(String provider) {
+        // TODO Auto-generated method stub
         Log.d(TAG, "- onProviderEnabled: " + provider);
     }
-
     public void onStatusChanged(String provider, int status, Bundle extras) {
+        // TODO Auto-generated method stub
         Log.d(TAG, "- onStatusChanged: " + provider + ", status: " + status);
     }
+    private void schedulePostLocations() {
+        PostLocationTask task = new PositionUpdateService.PostLocationTask();
+        Log.d(TAG, "beforeexecute " +  task.getStatus());
 
-    private boolean postLocation(android.location.Location loc) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
+            task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+        else
+            task.execute();
+        Log.d(TAG, "afterexecute " +  task.getStatus());
+    }
 
-        au.com.cathis.plugin.message.immobilize.Location l = au.com.cathis.plugin.message.immobilize.Location.fromAndroidLocation(loc);
-
+    private boolean postLocation(au.com.cathis.plugin.message.immobilize.data.Location l, LocationDAO dao) {
         if (l == null) {
             Log.w(TAG, "postLocation: null location");
             return false;
@@ -464,7 +636,7 @@ public class PositionUpdateService extends Service implements LocationListener {
             lastUpdateTime = SystemClock.elapsedRealtime();
             Log.i(TAG, "Posting  native location update: " + l);
             DefaultHttpClient httpClient = new DefaultHttpClient();
-            HttpPost request = new HttpPost(apiUrl);
+            HttpPost request = new HttpPost(url);
 
             JSONObject location = new JSONObject();
             location.put("latitude", l.getLatitude());
@@ -473,7 +645,7 @@ public class PositionUpdateService extends Service implements LocationListener {
             location.put("speed", l.getSpeed());
             location.put("bearing", l.getBearing());
             location.put("altitude", l.getAltitude());
-            location.put("recorded_at", l.getRecordedAt());
+            location.put("recorded_at", dao.dateToString(l.getRecordedAt()));
             params.put("location", location);
 
             Log.i(TAG, "location: " + location.toString());
@@ -484,11 +656,11 @@ public class PositionUpdateService extends Service implements LocationListener {
             request.setHeader("Content-type", "application/json");
 
             Iterator<String> headkeys = headers.keys();
-            while (headkeys.hasNext()) {
+            while( headkeys.hasNext() ){
                 String headkey = headkeys.next();
-                if (headkey != null) {
-                    Log.d(TAG, "Adding Header: " + headkey + " : " + (String) headers.getString(headkey));
-                    request.setHeader(headkey, (String) headers.getString(headkey));
+                if(headkey != null) {
+                    Log.d(TAG, "Adding Header: " + headkey + " : " + (String)headers.getString(headkey));
+                    request.setHeader(headkey, (String)headers.getString(headkey));
                 }
             }
             Log.d(TAG, "Posting to " + request.getURI().toString());
@@ -503,6 +675,16 @@ public class PositionUpdateService extends Service implements LocationListener {
             Log.w(TAG, "Exception posting location: " + e);
             e.printStackTrace();
             return false;
+        }
+    }
+    private void persistLocation(android.location.Location location) {
+        LocationDAO dao = DAOFactory.createLocationDAO(this.getApplicationContext());
+        au.com.cathis.plugin.message.immobilize.data.Location savedLocation = au.com.cathis.plugin.message.immobilize.data.Location.fromAndroidLocation(location);
+
+        if (dao.persistLocation(savedLocation)) {
+            Log.d(TAG, "Persisted Location: " + savedLocation);
+        } else {
+            Log.w(TAG, "Failed to persist location");
         }
     }
 
@@ -523,11 +705,11 @@ public class PositionUpdateService extends Service implements LocationListener {
         cleanUp();
         super.onDestroy();
     }
-
     private void cleanUp() {
         locationManager.removeUpdates(this);
         alarmManager.cancel(stationaryAlarmPI);
         alarmManager.cancel(stationaryLocationPollingPI);
+        toneGenerator.release();
 
         unregisterReceiver(stationaryAlarmReceiver);
         unregisterReceiver(singleUpdateReceiver);
@@ -543,5 +725,32 @@ public class PositionUpdateService extends Service implements LocationListener {
         }
         stopForeground(true);
         wakeLock.release();
+    }
+
+    @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        this.stopSelf();
+        super.onTaskRemoved(rootIntent);
+    }
+
+    private class PostLocationTask extends AsyncTask<Object, Integer, Boolean> {
+
+        @Override
+        protected Boolean doInBackground(Object...objects) {
+            Log.d(TAG, "Executing PostLocationTask#doInBackground");
+            LocationDAO locationDAO = DAOFactory.createLocationDAO(PositionUpdateService.this.getApplicationContext());
+            for (au.com.cathis.plugin.message.immobilize.data.Location savedLocation : locationDAO.getAllLocations()) {
+                Log.d(TAG, "Posting saved location");
+                if (postLocation(savedLocation, locationDAO)) {
+                    locationDAO.deleteLocation(savedLocation);
+                }
+            }
+            return true;
+        }
+        @Override
+        protected void onPostExecute(Boolean result) {
+            Log.d(TAG, "PostLocationTask#onPostExecture");
+        }
     }
 }

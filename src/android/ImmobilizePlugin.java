@@ -1,5 +1,6 @@
 package au.com.cathis.plugin.message.immobilize;
 
+import android.provider.Settings;
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaPlugin;
 import org.json.JSONArray;
@@ -38,23 +39,24 @@ public class ImmobilizePlugin extends CordovaPlugin {
             if(isUpdateEnabled){
                 callbackContext.error("Position Updates already enabled.");
             }else{
-                callbackContext.success();
+
                 try{
 
                     JSONObject postParameters = new JSONObject();
                     postParameters.put("accessToken", data.getString(2));
-
+                    postParameters.put("deviceId", Settings.Secure.getString(activity.getContentResolver(), Settings.Secure.ANDROID_ID));
+                    callbackContext.success();
                     updateServiceIntent.putExtra("url", data.getString(1));
                     updateServiceIntent.putExtra("params", postParameters.toString());
-                    //updateServiceIntent.putExtra("headers", new JSONObject().toString());
-                    //updateServiceIntent.putExtra("stationaryRadius", 50);
-                    updateServiceIntent.putExtra("movingAccuracy", data.getString(0));
-                    //updateServiceIntent.putExtra("distanceFilter", distanceFilter);
-                    //updateServiceIntent.putExtra("locationTimeout", locationTimeout);
-                    //updateServiceIntent.putExtra("isDebugging", isDebugging);
-                    //updateServiceIntent.putExtra("notificationTitle", notificationTitle);
-                    //updateServiceIntent.putExtra("notificationText", notificationText);
-                    //updateServiceIntent.putExtra("stopOnTerminate", stopOnTerminate);
+                    updateServiceIntent.putExtra("headers", new JSONObject().toString());
+                    updateServiceIntent.putExtra("stationaryRadius", data.getString(0));
+                    updateServiceIntent.putExtra("desiredAccuracy", "100");
+                    updateServiceIntent.putExtra("distanceFilter", "10");
+                    updateServiceIntent.putExtra("locationTimeout", "30");
+                    updateServiceIntent.putExtra("isDebugging", true);
+                    updateServiceIntent.putExtra("notificationTitle", "GPS Location Monitoring");
+                    updateServiceIntent.putExtra("notificationText", "ACTIVE");
+                    updateServiceIntent.putExtra("stopOnTerminate", "false");
 
                     activity.startService(updateServiceIntent);
                     isUpdateEnabled = true;
