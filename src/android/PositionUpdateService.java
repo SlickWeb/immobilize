@@ -1,5 +1,3 @@
-package au.com.cathis.plugin.message.immobilize;
-
 import android.annotation.TargetApi;
 import android.app.*;
 import android.content.BroadcastReceiver;
@@ -7,7 +5,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.location.Criteria;
-import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.media.ToneGenerator;
@@ -44,7 +41,7 @@ public class PositionUpdateService extends Service implements LocationListener {
     private static final Integer MAX_SPEED_ACQUISITION_ATTEMPTS = 3;
 
     private PowerManager.WakeLock wakeLock;
-    private Location lastLocation;
+    private android.location.Location lastLocation;
     private long lastUpdateTime = 0l;
 
     private JSONObject params;
@@ -57,7 +54,7 @@ public class PositionUpdateService extends Service implements LocationListener {
     private Integer locationAcquisitionAttempts = 0;
 
     private float movingAccuracy;
-    private Location stationaryLocation;
+    private android.location.Location stationaryLocation;
     private PendingIntent stationaryAlarmPI;
     private PendingIntent stationaryLocationPollingPI;
     private long stationaryLocationPollingInterval;
@@ -233,12 +230,12 @@ public class PositionUpdateService extends Service implements LocationListener {
      *
      * @return The most accurate and / or timely previously detected location.
      */
-    public Location getLastBestLocation() {
+    public android.location.Location getLastBestLocation() {
         int minDistance = (int) movingAccuracy;
         long minTime = System.currentTimeMillis() - (locationTimeout * 1000);
 
         Log.i(TAG, "- fetching last best location " + minDistance + "," + minTime);
-        Location bestResult = null;
+        android.location.Location bestResult = null;
         float bestAccuracy = Float.MAX_VALUE;
         long bestTime = Long.MIN_VALUE;
 
@@ -248,7 +245,7 @@ public class PositionUpdateService extends Service implements LocationListener {
         List<String> matchingProviders = locationManager.getAllProviders();
         for (String provider : matchingProviders) {
             Log.d(TAG, "- provider: " + provider);
-            Location location = locationManager.getLastKnownLocation(provider);
+            android.location.Location location = locationManager.getLastKnownLocation(provider);
             if (location != null) {
                 Log.d(TAG, " location: " + location.getLatitude() + "," + location.getLongitude() + "," + location.getAccuracy() + "," + location.getSpeed() + "m/s");
                 float accuracy = location.getAccuracy();
@@ -264,7 +261,7 @@ public class PositionUpdateService extends Service implements LocationListener {
         return bestResult;
     }
 
-    public void onLocationChanged(Location location) {
+    public void onLocationChanged(android.location.Location location) {
         Log.d(TAG, "- onLocationChanged: " + location.getLatitude() + "," + location.getLongitude() + ", accuracy: " + location.getAccuracy() + ", isMoving: " + isMoving + ", speed: " + location.getSpeed());
 
         if (!isMoving) {
@@ -316,7 +313,7 @@ public class PositionUpdateService extends Service implements LocationListener {
         alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + STATIONARY_TIMEOUT, stationaryAlarmPI); // Millisec * Second * Minute
     }
 
-    private void startMonitoringStationaryRegion(Location location) {
+    private void startMonitoringStationaryRegion(android.location.Location location) {
         locationManager.removeUpdates(this);
         stationaryLocation = location;
 
@@ -343,7 +340,7 @@ public class PositionUpdateService extends Service implements LocationListener {
         alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP, start, interval, stationaryLocationPollingPI);
     }
 
-    public void onPollStationaryLocation(Location location) {
+    public void onPollStationaryLocation(android.location.Location location) {
         if (isMoving) {
             return;
         }
@@ -362,7 +359,7 @@ public class PositionUpdateService extends Service implements LocationListener {
     /**
      * User has exit his stationary region!  Initiate aggressive geolocation!
      */
-    public void onExitStationaryRegion(Location location) {
+    public void onExitStationaryRegion(android.location.Location location) {
 
         // Cancel the periodic stationary location monitor alarm.
         alarmManager.cancel(stationaryLocationPollingPI);
@@ -381,7 +378,7 @@ public class PositionUpdateService extends Service implements LocationListener {
         @Override
         public void onReceive(Context context, Intent intent) {
             String key = LocationManager.KEY_LOCATION_CHANGED;
-            Location location = (Location) intent.getExtras().get(key);
+            android.location.Location location = (android.location.Location) intent.getExtras().get(key);
             if (location != null) {
                 Log.d(TAG, "- singleUpdateReciever" + location.toString());
                 onPollStationaryLocation(location);
@@ -433,7 +430,7 @@ public class PositionUpdateService extends Service implements LocationListener {
             } else {
                 Log.d(TAG, "- EXIT");
                 // There MUST be a valid, recent location if this event-handler was called.
-                Location location = getLastBestLocation();
+                android.location.Location location = getLastBestLocation();
                 if (location != null) {
                     onExitStationaryRegion(location);
                 }
@@ -453,9 +450,9 @@ public class PositionUpdateService extends Service implements LocationListener {
         Log.d(TAG, "- onStatusChanged: " + provider + ", status: " + status);
     }
 
-    private boolean postLocation(Location loc) {
+    private boolean postLocation(android.location.Location loc) {
 
-        au.com.cathis.plugin.message.immobilize.Location l =  au.com.cathis.plugin.message.immobilize.Location.fromAndroidLocation(loc);
+        Location l =  Location.fromAndroidLocation(loc);
 
         if (l == null) {
             Log.w(TAG, "postLocation: null location");
