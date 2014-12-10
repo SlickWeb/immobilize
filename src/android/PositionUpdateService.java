@@ -454,7 +454,7 @@ public class PositionUpdateService extends Service implements LocationListener {
 
     private boolean postLocation(android.location.Location loc) {
 
-        Location l =  Location.fromAndroidLocation(loc);
+        au.com.cathis.plugin.message.immobilize.Location l = au.com.cathis.plugin.message.immobilize.Location.fromAndroidLocation(loc);
 
         if (l == null) {
             Log.w(TAG, "postLocation: null location");
