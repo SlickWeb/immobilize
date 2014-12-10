@@ -13,8 +13,7 @@
         <engine name="cordova" version=">=3.0.0" />
     </engines>
 
-    <dependency id="org.apache.cordova.geolocation" />
-    <dependency id="org.apache.cordova.dialogs" />
+    <dependency id="org.transistorsoft.cordova.background-geolocation" url="https://github.com/christocracy/cordova-plugin-background-geolocation.git" />
 
     <js-module src="www/Immobilize.js" name="Immobilize">
         <clobbers target="plugins.immobilize" />
@@ -23,22 +22,6 @@
     <!-- android -->
     <platform name="android">
         <source-file src="src/android/ImmobilizePlugin.java" target-dir="src/au/com/cathis/plugin/message/immobilize" />
-        <source-file src="src/android/PositionService.java" target-dir="src/au/com/cathis/plugin/message/immobilize" />
-
-        <source-file src="src/android/notification.png" target-dir="res/drawable" />
-
-        <config-file target="AndroidManifest.xml" parent="/manifest/application">
-            <service android:name="au.com.cathis.plugin.message.immobilize.PositionService" android:enabled="true" android:process=":remote" />
-        </config-file>
-
-        <config-file target="AndroidManifest.xml" parent="/manifest">
-            <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-            <uses-permission android:name="android.permission.ACCESS_LOCATION_EXTRA_COMMANDS" />
-            <uses-permission android:name="android.permission.INTERNET" />
-            <uses-permission android:name="android.permission.WAKE_LOCK" />
-        </config-file>   
         <config-file target="res/xml/config.xml" parent="/*">
             <feature name="Immobilize">
                 <param name="android-package" value="au.com.cathis.plugin.message.immobilize.ImmobilizePlugin"/>
