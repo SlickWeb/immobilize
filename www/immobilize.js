@@ -12,7 +12,7 @@ module.exports = {
     update: function(movingAccuracy, apiUrl, accessToken, success, failure) {
         exec(success || function() {},
              failure || function() {},
-             'ImmobilizePlugin',
+             'Immobilize',
              'update',
              [movingAccuracy, apiUrl, accessToken]);
     },
@@ -25,7 +25,7 @@ module.exports = {
     stopUpdate: function(success, failure) {
         exec(success || function() {},
             failure || function() {},
-            'ImmobilizePlugin',
+            'Immobilize',
             'stopUpdate',
             []);
     }
