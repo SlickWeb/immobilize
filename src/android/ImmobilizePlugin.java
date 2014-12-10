@@ -35,7 +35,7 @@ public class ImmobilizePlugin extends CordovaPlugin {
         updateServiceIntent = new Intent(activity, PositionUpdateService.class);
 
         if (ACTION_UPDATE.equalsIgnoreCase(action)) {
-            if(!isUpdateEnabled){
+            if(isUpdateEnabled){
                 callbackContext.error("Position Updates already enabled.");
             }else{
                 callbackContext.success();
@@ -58,14 +58,16 @@ public class ImmobilizePlugin extends CordovaPlugin {
 
                     activity.startService(updateServiceIntent);
                     isUpdateEnabled = true;
-
+                    result = true;
                 }catch (JSONException ex){
                     callbackContext.error("Could not parse the provided parameters to this action. Error: "+ex.getMessage());
                 }
             }
+
         } else if (ACTION_STOP_UPDATE.equalsIgnoreCase(action)) {
             isUpdateEnabled = false;
             activity.stopService(updateServiceIntent);
+            result = true;
             callbackContext.success();
         }
 
