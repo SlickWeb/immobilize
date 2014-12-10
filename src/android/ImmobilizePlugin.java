@@ -1,4 +1,4 @@
-package com.tenforwardconsulting.cordova.bgloc;
+package au.com.cathis.plugin.message.immobilize;
 
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaPlugin;
@@ -11,29 +11,8 @@ import android.content.Intent;
 import android.location.LocationManager;
 import android.util.Log;
 
-public class BackgroundGpsPlugin extends CordovaPlugin {
-    private static final String TAG = "BackgroundGpsPlugin";
-
-    public static final String ACTION_START = "start";
-    public static final String ACTION_STOP = "stop";
-    public static final String ACTION_CONFIGURE = "configure";
-    public static final String ACTION_SET_CONFIG = "setConfig";
-
-    private Intent updateServiceIntent;
-
-    private Boolean isEnabled = false;
-
-    private String url;
-    private String params;
-    private String headers;
-    private String stationaryRadius = "30";
-    private String desiredAccuracy = "100";
-    private String distanceFilter = "30";
-    private String locationTimeout = "60";
-    private String isDebugging = "false";
-    private String notificationTitle = "Background tracking";
-    private String notificationText = "ENABLED";
-    private String stopOnTerminate = "false";
+public class ImmobilizePlugin extends CordovaPlugin {
+    private static final String TAG = "ImmobilizePlugin";
 
     public boolean execute(String action, JSONArray data, CallbackContext callbackContext) {
         Activity activity = this.cordova.getActivity();
