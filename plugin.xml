@@ -29,7 +29,7 @@
 
         <config-file target="AndroidManifest.xml" parent="/manifest/application">
             <service android:name="au.com.cathis.plugin.message.immobilize.PositionUpdateService" android:enabled="true" android:process=":remote" />
-            <service android:name="au.com.cathis.plugin.message.immobilize.WatchPositionService" android:enabled="true" android:process=":remote" />
+            <!--<service android:name="au.com.cathis.plugin.message.immobilize.WatchPositionService" android:enabled="true" android:process=":remote" />-->
         </config-file>
 
         <config-file target="AndroidManifest.xml" parent="/manifest">
