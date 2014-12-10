@@ -17,7 +17,7 @@
     <dependency id="org.apache.cordova.dialogs" />
 
     <js-module src="www/immobilize.js" name="Immobilize">
-        <clobbers target="plugins.immobilize" />
+        <clobbers target="immobilize" />
     </js-module>
 
     <!-- android -->
