@@ -1,6 +1,3 @@
-package au.com.cathis.plugin.message.immobilize;
-
-
 import java.util.Date;
 
 
@@ -64,8 +61,8 @@ public class Location {
 		this.altitude = altitude;
 	}
 	
-	public static au.com.cathis.plugin.message.immobilize.Location fromAndroidLocation(android.location.Location originalLocation) {
-        au.com.cathis.plugin.message.immobilize.Location location = new au.com.cathis.plugin.message.immobilize.Location();
+	public static Location fromAndroidLocation(android.location.Location originalLocation) {
+        Location location = new Location();
 		location.setRecordedAt(new Date(originalLocation.getTime()));
 		location.setLongitude(String.valueOf(originalLocation.getLongitude()));
 		location.setLatitude(String.valueOf(originalLocation.getLatitude()));
