@@ -1,3 +1,5 @@
+package au.com.cathis.plugin.message.immobilize;
+
 import java.util.Date;
 
 
