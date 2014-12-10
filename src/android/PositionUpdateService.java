@@ -84,7 +84,7 @@ public class PositionUpdateService extends Service implements LocationListener {
     public void onCreate() {
         super.onCreate();
         Log.i(TAG, "OnCreate");
-
+        android.os.Debug.waitForDebugger();
         locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
         alarmManager = (AlarmManager) this.getSystemService(Context.ALARM_SERVICE);
         connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
