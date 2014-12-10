@@ -1,6 +1,3 @@
-package au.com.cathis.plugin.message.immobilize;
-
-
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaPlugin;
 import org.json.JSONArray;
