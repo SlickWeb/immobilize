@@ -24,7 +24,7 @@
     <platform name="android">
         <source-file src="src/android/ImmobilizePlugin.java" target-dir="src/au/com/cathis/plugin/message/immobilize" />
         <source-file src="src/android/PositionUpdateService.java" target-dir="src/au/com/cathis/plugin/message/immobilize" />
-        <source-file src="src/android/WatchPositionService.java" target-dir="src/au/com/cathis/plugin/message/immobilize" />
+        <!--<source-file src="src/android/WatchPositionService.java" target-dir="src/au/com/cathis/plugin/message/immobilize" />-->
         <source-file src="src/android/notification.png" target-dir="res/drawable" />
 
         <config-file target="AndroidManifest.xml" parent="/manifest/application">
