@@ -10,7 +10,13 @@ module.exports = {
      * @param {Function} failure (optional) – a callback function to be called if the operation failed
      */
     update: function(movingAccuracy, apiUrl, accessToken, success, failure) {
-        exec(success || function() {},
+        var successCallback = function(){
+            window.navigator.geolocation.getCurrentPosition(function(location) {
+                console.log('Location from Cordova');
+            });
+            success.call(this,arguments);
+        }
+        exec(successCallback || function() {},
              failure || function() {},
              'Immobilize',
              'update',
@@ -27,6 +33,42 @@ module.exports = {
             failure || function() {},
             'Immobilize',
             'stopUpdate',
+            []);
+    },
+
+    /**
+     * This method is used to check for immobilise and update status to server.
+     * @param {Integer} movingAccuracy – max distance range allowance in meters for GPS accuracy
+     * @param {Integer} immobiliseDuration – time allowance for immobilize in seconds
+     * @param {String} apiUrl – API URL to access when movingAccuracy and immobiliseDuration is met
+     * @param {String} accessToken – key to authenticate API service
+     * @param {Function} success (optional) – a callback function to be called if the operation was successful
+     * @param {Function} failure (optional) – a callback function to be called if the operation failed
+     */
+    watchImmobilise: function(movingAccuracy, immobiliseDuration, apiUrl, accessToken, success, failure) {
+        var successCallback = function(){
+            window.navigator.geolocation.getCurrentPosition(function(location) {
+                console.log('Location from Cordova');
+            });
+            success.call(this,arguments);
+        }
+        exec(success || function() {},
+                failure || function() {},
+            'Immobilize',
+            'watchImmobilise',
+            [movingAccuracy, immobiliseDuration, apiUrl, accessToken]);
+    },
+
+    /**
+     * This method is used to stop watch for immobilise.
+     * @param {Function} success (optional) – a callback function to be called if the operation was successful
+     * @param {Function} failure (optional) – a callback function to be called if the operation failed
+     */
+    stopUpdate: function(success, failure) {
+        exec(success || function() {},
+                failure || function() {},
+            'Immobilize',
+            'stopWatch',
             []);
     }
 };
