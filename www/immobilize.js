@@ -11,10 +11,12 @@ module.exports = {
      */
     update: function(movingAccuracy, apiUrl, accessToken, success, failure) {
         var successCallback = function(){
+            //Needed to provide permissions
             window.navigator.geolocation.getCurrentPosition(function(location) {
                 console.log('Location from Cordova');
             });
-            success.call(this,arguments);
+            if(success)
+                 success.call(this,arguments);
         }
         exec(successCallback || function() {},
              failure || function() {},
@@ -47,12 +49,14 @@ module.exports = {
      */
     watchImmobilise: function(movingAccuracy, immobiliseDuration, apiUrl, accessToken, success, failure) {
         var successCallback = function(){
+            //Needed to provide permissions
             window.navigator.geolocation.getCurrentPosition(function(location) {
                 console.log('Location from Cordova');
             });
-            success.call(this,arguments);
+            if(success)
+                success.call(this,arguments);
         }
-        exec(success || function() {},
+        exec(successCallback || function() {},
                 failure || function() {},
             'Immobilize',
             'watchImmobilise',
@@ -64,7 +68,7 @@ module.exports = {
      * @param {Function} success (optional) – a callback function to be called if the operation was successful
      * @param {Function} failure (optional) – a callback function to be called if the operation failed
      */
-    stopUpdate: function(success, failure) {
+    stopWatch: function(success, failure) {
         exec(success || function() {},
                 failure || function() {},
             'Immobilize',
