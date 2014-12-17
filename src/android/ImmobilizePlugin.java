@@ -30,10 +30,19 @@ public class ImmobilizePlugin extends CordovaPlugin {
     private Boolean isUpdateEnabled = false;
     private Boolean isWatchingEnabled = false;
 
+    /**
+     * The standard execute method that Cordova calls for every plugin when a call to executeNative is performed on the JavaScript side.
+     * @param action          The action to execute.
+     * @param data            The parameters for the call.
+     * @param callbackContext The callback context used when calling back into JavaScript.
+     * @return true if an appropriate action was called.
+     */
     public boolean execute(String action, JSONArray data, CallbackContext callbackContext) {
+
         Activity activity = this.cordova.getActivity();
         Boolean result = false;
         updateServiceIntent = new Intent(activity, PositionUpdateService.class);
+        watchServiceIntent = new Intent(activity, WatchImmobilizeService.class);
 
         if (ACTION_UPDATE.equalsIgnoreCase(action)) {
             if(isUpdateEnabled){
@@ -49,26 +58,63 @@ public class ImmobilizePlugin extends CordovaPlugin {
                     updateServiceIntent.putExtra("url", data.getString(1));
                     updateServiceIntent.putExtra("params", postParameters.toString());
                     updateServiceIntent.putExtra("headers", new JSONObject().toString());
-                    updateServiceIntent.putExtra("stationaryRadius", data.getString(0));
                     updateServiceIntent.putExtra("desiredAccuracy", "100");
-                    updateServiceIntent.putExtra("distanceFilter", "10");
-                    updateServiceIntent.putExtra("locationTimeout", "30");
-                    updateServiceIntent.putExtra("isDebugging", true);
+                    updateServiceIntent.putExtra("distanceFilter", data.getString(0));
+                    updateServiceIntent.putExtra("locationTimeout", "15");
                     updateServiceIntent.putExtra("notificationTitle", "GPS Location Monitoring");
                     updateServiceIntent.putExtra("notificationText", "ACTIVE");
-                    updateServiceIntent.putExtra("stopOnTerminate", "false");
 
                     activity.startService(updateServiceIntent);
                     isUpdateEnabled = true;
                     result = true;
                 }catch (JSONException ex){
+                    Log.e(TAG, "There was a problem creating the JSON object for the parameters: "+ex.getMessage());
                     callbackContext.error("Could not parse the provided parameters to this action. Error: "+ex.getMessage());
                 }
             }
 
-        } else if (ACTION_STOP_UPDATE.equalsIgnoreCase(action)) {
+        }
+        else if (ACTION_STOP_UPDATE.equalsIgnoreCase(action)) {
             isUpdateEnabled = false;
             activity.stopService(updateServiceIntent);
+            result = true;
+            callbackContext.success();
+        }
+        else if (ACTION_WATCH_IMMOBILISE.equalsIgnoreCase(action)) {
+            if(isWatchingEnabled){
+                callbackContext.error("Watch Immobilize already enabled.");
+            }else{
+
+                try{
+
+                    JSONObject postParameters = new JSONObject();
+                    postParameters.put("accessToken", data.getString(3));
+                    postParameters.put("deviceId", Settings.Secure.getString(activity.getContentResolver(), Settings.Secure.ANDROID_ID));
+                    callbackContext.success();
+                    watchServiceIntent.putExtra("url", data.getString(2));
+                    watchServiceIntent.putExtra("params", postParameters.toString());
+                    watchServiceIntent.putExtra("headers", new JSONObject().toString());
+                    watchServiceIntent.putExtra("desiredAccuracy", "100");
+                    watchServiceIntent.putExtra("distanceFilter", "0");
+                    watchServiceIntent.putExtra("movingAccuracy", data.getString(0));
+                    watchServiceIntent.putExtra("locationTimeout", "15");
+                    watchServiceIntent.putExtra("immobilizeDuration", data.getString(1));
+                    watchServiceIntent.putExtra("isDebugging", "true");
+                    watchServiceIntent.putExtra("notificationTitle", "GPS Location Monitoring");
+                    watchServiceIntent.putExtra("notificationText", "ACTIVE");
+
+                    activity.startService(watchServiceIntent);
+                    isWatchingEnabled = true;
+                    result = true;
+                }catch (JSONException ex){
+                    Log.e(TAG, "There was a problem creating the JSON object for the parameters: "+ex.getMessage());
+                    callbackContext.error("Could not parse the provided parameters to this action. Error: "+ex.getMessage());
+                }
+            }
+        }
+        else if (ACTION_STOP_WATCH.equalsIgnoreCase(action)) {
+            isWatchingEnabled = false;
+            activity.stopService(watchServiceIntent);
             result = true;
             callbackContext.success();
         }
@@ -83,5 +129,6 @@ public class ImmobilizePlugin extends CordovaPlugin {
     public void onDestroy() {
         Activity activity = this.cordova.getActivity();
         activity.stopService(updateServiceIntent);
+        activity.stopService(watchServiceIntent);
     }
 }
