@@ -291,32 +291,26 @@ public class WatchImmobilizeService extends Service implements LocationListener 
             DefaultHttpClient httpClient = new DefaultHttpClient();
             HttpPost request = new HttpPost(url);
 
-            JSONObject location = new JSONObject();
-            location.put("latitude", l.getLatitude());
-            location.put("longitude", l.getLongitude());
-            location.put("accuracy", l.getAccuracy());
-            location.put("speed", l.getSpeed());
-            location.put("bearing", l.getBearing());
-            location.put("altitude", l.getAltitude());
-            location.put("recorded_at", dao.dateToString(l.getRecordedAt()));
-            params.put("location", location);
+            JSONObject requestBody = new JSONObject();
+            //requestBody.put("time", dao.dateToString(l.getRecordedAt()));
+            requestBody.put("longitude", Double.parseDouble(l.getLongitude()));
+            requestBody.put("latitude", Double.parseDouble(l.getLatitude()));
+            requestBody.put("accuracy", Double.parseDouble(l.getAccuracy()));
 
-            Log.i(TAG, "location: " + location.toString());
-
-            StringEntity se = new StringEntity(params.toString());
+            StringEntity se = new StringEntity(requestBody.toString());
             request.setEntity(se);
             request.setHeader("Accept", "application/json");
-            request.setHeader("Content-type", "application/json");
 
             Iterator<String> headkeys = headers.keys();
             while (headkeys.hasNext()) {
                 String headkey = headkeys.next();
                 if (headkey != null) {
-                    Log.d(TAG, "Adding Header: " + headkey + " : " + (String) headers.getString(headkey));
-                    request.setHeader(headkey, (String) headers.getString(headkey));
+                    Log.d(TAG, "Adding Header: " + headkey + " : " + headers.getString(headkey));
+                    request.setHeader(headkey,  headers.getString(headkey));
                 }
             }
             Log.d(TAG, "Posting to " + request.getURI().toString());
+            Log.d(TAG, "Posting " + requestBody.toString());
             HttpResponse response = httpClient.execute(request);
             Log.i(TAG, "Response received: " + response.getStatusLine());
             if (response.getStatusLine().getStatusCode() == 200) {
