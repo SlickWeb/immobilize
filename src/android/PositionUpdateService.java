@@ -15,6 +15,7 @@ import au.com.cathis.plugin.message.immobilize.data.DAOFactory;
 import au.com.cathis.plugin.message.immobilize.data.LocationDAO;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpPut;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.json.JSONException;
@@ -232,36 +233,39 @@ public class PositionUpdateService extends Service implements LocationListener {
             return false;
         }
         try {
+
+            System.setProperty("org.apache.commons.logging.Log","org.apache.commons.logging.impl.SimpleLog");
+            System.setProperty("org.apache.commons.logging.simplelog.showdatetime", "true");
+            System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.http.wire", "DEBUG");
+            System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.http.impl.conn", "DEBUG");
+            System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.http.impl.client", "DEBUG");
+            System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.http.client", "DEBUG");
+            System.setProperty("org.apache.commons.logging.simplelog.log.org.apache.http", "DEBUG");
+
             Log.i(TAG, "Posting  native location update: " + l);
             DefaultHttpClient httpClient = new DefaultHttpClient();
-            HttpPost request = new HttpPost(url);
+            HttpPut request = new HttpPut(url);
 
-            JSONObject location = new JSONObject();
-            location.put("latitude", l.getLatitude());
-            location.put("longitude", l.getLongitude());
-            location.put("accuracy", l.getAccuracy());
-            location.put("speed", l.getSpeed());
-            location.put("bearing", l.getBearing());
-            location.put("altitude", l.getAltitude());
-            location.put("recorded_at", dao.dateToString(l.getRecordedAt()));
-            params.put("location", location);
+            JSONObject requestBody = new JSONObject();
+            //requestBody.put("time", dao.dateToString(l.getRecordedAt()));
+            requestBody.put("longitude", Double.parseDouble(l.getLongitude()));
+            requestBody.put("latitude", Double.parseDouble(l.getLatitude()));
 
-            Log.i(TAG, "location: " + location.toString());
-
-            StringEntity se = new StringEntity(params.toString());
+            StringEntity se = new StringEntity(requestBody.toString());
             request.setEntity(se);
             request.setHeader("Accept", "application/json");
-            request.setHeader("Content-type", "application/json");
 
             Iterator<String> headkeys = headers.keys();
             while (headkeys.hasNext()) {
                 String headkey = headkeys.next();
                 if (headkey != null) {
-                    Log.d(TAG, "Adding Header: " + headkey + " : " + (String) headers.getString(headkey));
-                    request.setHeader(headkey, (String) headers.getString(headkey));
+                    Log.d(TAG, "Adding Header: " + headkey + " : " + headers.getString(headkey));
+                    request.setHeader(headkey, headers.getString(headkey));
                 }
             }
+            Log.d(TAG, "Posting " + requestBody.toString());
             Log.d(TAG, "Posting to " + request.getURI().toString());
+
             HttpResponse response = httpClient.execute(request);
             Log.i(TAG, "Response received: " + response.getStatusLine());
             if (response.getStatusLine().getStatusCode() == 200) {
