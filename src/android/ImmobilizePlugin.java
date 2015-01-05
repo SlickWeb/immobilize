@@ -52,12 +52,15 @@ public class ImmobilizePlugin extends CordovaPlugin {
                 try{
 
                     JSONObject postParameters = new JSONObject();
-                    postParameters.put("accessToken", data.getString(2));
                     postParameters.put("deviceId", Settings.Secure.getString(activity.getContentResolver(), Settings.Secure.ANDROID_ID));
                     callbackContext.success();
                     updateServiceIntent.putExtra("url", data.getString(1));
                     updateServiceIntent.putExtra("params", postParameters.toString());
-                    updateServiceIntent.putExtra("headers", new JSONObject().toString());
+                    JSONObject headers = new JSONObject();
+                    headers.put("access_token",data.getString(2));
+                    headers.put("Content-Type","application/json");
+                    headers.put("Cache-Control","no-cache");
+                    updateServiceIntent.putExtra("headers", headers.toString());
                     updateServiceIntent.putExtra("desiredAccuracy", "100");
                     updateServiceIntent.putExtra("distanceFilter", data.getString(0));
                     updateServiceIntent.putExtra("locationTimeout", "15");
@@ -88,12 +91,15 @@ public class ImmobilizePlugin extends CordovaPlugin {
                 try{
 
                     JSONObject postParameters = new JSONObject();
-                    postParameters.put("accessToken", data.getString(3));
                     postParameters.put("deviceId", Settings.Secure.getString(activity.getContentResolver(), Settings.Secure.ANDROID_ID));
                     callbackContext.success();
                     watchServiceIntent.putExtra("url", data.getString(2));
                     watchServiceIntent.putExtra("params", postParameters.toString());
-                    watchServiceIntent.putExtra("headers", new JSONObject().toString());
+                    JSONObject headers = new JSONObject();
+                    headers.put("access_token",data.getString(3));
+                    headers.put("Content-Type","application/json");
+                    headers.put("Cache-Control","no-cache");
+                    watchServiceIntent.putExtra("headers", headers.toString());
                     watchServiceIntent.putExtra("desiredAccuracy", "100");
                     watchServiceIntent.putExtra("distanceFilter", "0");
                     watchServiceIntent.putExtra("movingAccuracy", data.getString(0));
