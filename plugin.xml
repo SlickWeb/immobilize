@@ -24,7 +24,12 @@
     <platform name="android">
         <source-file src="src/android/ImmobilizePlugin.java" target-dir="src/au/com/cathis/plugin/message/immobilize" />
         <source-file src="src/android/PositionUpdateService.java" target-dir="src/au/com/cathis/plugin/message/immobilize" />
-        <source-file src="src/android/Location.java" target-dir="src/au/com/cathis/plugin/message/immobilize" />
+        <source-file src="src/android/WatchImmobilizeService.java" target-dir="src/au/com/cathis/plugin/message/immobilize" />
+        <source-file src="src/android/data/DAOFactory.java" target-dir="src/au/com/cathis/plugin/message/immobilize/data" />
+        <source-file src="src/android/data/Location.java" target-dir="src/au/com/cathis/plugin/message/immobilize/data" />
+        <source-file src="src/android/data/LocationDAO.java" target-dir="src/au/com/cathis/plugin/message/immobilize/data" />
+        <source-file src="src/android/data/sqlite/LocationOpenHelper.java" target-dir="src/au/com/cathis/plugin/message/immobilize/data/sqlite" />
+        <source-file src="src/android/data/sqlite/SQLiteLocationDAO.java" target-dir="src/au/com/cathis/plugin/message/immobilize/data/sqlite" />
         
         <config-file target="AndroidManifest.xml" parent="/manifest/application">
             <service android:name="au.com.cathis.plugin.message.immobilize.PositionUpdateService" android:enabled="true" android:process=":remote" />
