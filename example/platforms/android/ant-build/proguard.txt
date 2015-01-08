@@ -1,0 +1,6 @@
+# view AndroidManifest.xml #generated:5
+-keep class com.example.immobilizedemo.CordovaApp { <init>(...); }
+
+# view AndroidManifest.xml #generated:11
+-keep class au.com.cathis.plugin.message.immobilize.PositionUpdateService { <init>(...); }
+

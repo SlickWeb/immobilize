@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        xmlns:android="http://schemas.android.com/apk/res/android"
+    id="au.com.cathis.plugin.message.immobilize"
+    version="1.0.0">
+    <name>CathisImmobilize</name>
+    <description>Cordova Immobilize Plugin</description>
+    <license>None</license>
+    <keywords>immobilize, cathis</keywords>
+
+    <engines>
+        <engine name="cordova" version=">=3.0.0" />
+    </engines>
+
+    <dependency id="org.apache.cordova.geolocation" />
+    <dependency id="org.apache.cordova.dialogs" />
+
+    <js-module src="www/immobilize.js" name="Immobilize">
+        <clobbers target="immobilize" />
+    </js-module>
+
+    <!-- android -->
+    <platform name="android">
+        <source-file src="src/android/ImmobilizePlugin.java" target-dir="src/au/com/cathis/plugin/message/immobilize" />
+        <source-file src="src/android/PositionUpdateService.java" target-dir="src/au/com/cathis/plugin/message/immobilize" />
+        <source-file src="src/android/Location.java" target-dir="src/au/com/cathis/plugin/message/immobilize" />
+        
+        <config-file target="AndroidManifest.xml" parent="/manifest/application">
+            <service android:name="au.com.cathis.plugin.message.immobilize.PositionUpdateService" android:enabled="true" android:process=":remote" />
+        </config-file>
+
+        <config-file target="AndroidManifest.xml" parent="/manifest">
+            <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+            <uses-permission android:name="android.permission.ACCESS_LOCATION_EXTRA_COMMANDS" />
+            <uses-permission android:name="android.permission.INTERNET" />
+            <uses-permission android:name="android.permission.WAKE_LOCK" />
+        </config-file>
+        <config-file target="res/xml/config.xml" parent="/*">
+            <feature name="Immobilize">
+                <param name="android-package" value="au.com.cathis.plugin.message.immobilize.ImmobilizePlugin"/>
+            </feature>
+        </config-file> 
+     </platform>          
+
+    <!-- ios -->
+     <platform name="ios">
+        <!-- required background modes:  App registers for location updates -->
+        
+        <config-file target="*-Info.plist" parent="NSLocationAlwaysUsageDescription">
+            <string>This app requires background location tracking</string>
+        </config-file>
+
+        <config-file target="*-Info.plist" parent="UIBackgroundModes">
+            <array>
+                <string>location</string>
+            </array>
+        </config-file>
+
+        <config-file target="config.xml" parent="/*">
+            <feature name="Immobilize">
+                <param name="ios-package" value="ImmobilizePlugin"/>
+            </feature>
+        </config-file>
+        <framework src="AVFoundation.framework" weak="true" />
+        <source-file src="src/ios/ImmobilizePlugin.m" />
+        <header-file src="src/ios/ImmobilizePlugin.h" />
+     </platform>          
+
+</plugin>
