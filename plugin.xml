@@ -67,12 +67,12 @@
 
         <config-file target="config.xml" parent="/*">
             <feature name="Immobilize">
-                <param name="ios-package" value="ImmobilizePlugin"/>
+                <param name="ios-package" value="Immobilize"/>
             </feature>
         </config-file>
         <framework src="AVFoundation.framework" weak="true" />
-        <source-file src="src/ios/ImmobilizePlugin.m" />
-        <header-file src="src/ios/ImmobilizePlugin.h" />
+        <source-file src="src/ios/Immobilize.m" />
+        <header-file src="src/ios/Immobilize.h" />
      </platform>          
 
 </plugin>
