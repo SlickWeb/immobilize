@@ -1,4 +1,4 @@
-package au.com.cathis.plugin.message.immobilize;
+package au.com.cathis.plugins.location;
 
 import android.provider.Settings;
 import org.apache.cordova.CallbackContext;
