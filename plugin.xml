@@ -2,7 +2,7 @@
 
 <plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
         xmlns:android="http://schemas.android.com/apk/res/android"
-    id="au.com.cathis.plugin.message.immobilize"
+    id="au.com.cathis.plugins.location"
     version="1.0.0">
     <name>CathisImmobilize</name>
     <description>Cordova Immobilize Plugin</description>
@@ -22,18 +22,18 @@
 
     <!-- android -->
     <platform name="android">
-        <source-file src="src/android/ImmobilizePlugin.java" target-dir="src/au/com/cathis/plugin/message/immobilize" />
-        <source-file src="src/android/PositionUpdateService.java" target-dir="src/au/com/cathis/plugin/message/immobilize" />
-        <source-file src="src/android/WatchImmobilizeService.java" target-dir="src/au/com/cathis/plugin/message/immobilize" />
-        <source-file src="src/android/data/DAOFactory.java" target-dir="src/au/com/cathis/plugin/message/immobilize/data" />
-        <source-file src="src/android/data/Location.java" target-dir="src/au/com/cathis/plugin/message/immobilize/data" />
-        <source-file src="src/android/data/LocationDAO.java" target-dir="src/au/com/cathis/plugin/message/immobilize/data" />
-        <source-file src="src/android/data/sqlite/LocationOpenHelper.java" target-dir="src/au/com/cathis/plugin/message/immobilize/data/sqlite" />
-        <source-file src="src/android/data/sqlite/SQLiteLocationDAO.java" target-dir="src/au/com/cathis/plugin/message/immobilize/data/sqlite" />
+        <source-file src="src/android/ImmobilizePlugin.java" target-dir="src/au/com/cathis/plugins/location" />
+        <source-file src="src/android/PositionUpdateService.java" target-dir="src/au/com/cathis/plugins/location" />
+        <source-file src="src/android/WatchImmobilizeService.java" target-dir="src/au/com/cathis/plugins/location" />
+        <source-file src="src/android/data/DAOFactory.java" target-dir="src/au/com/cathis/plugins/location/data" />
+        <source-file src="src/android/data/Location.java" target-dir="src/au/com/cathis/plugins/location/data" />
+        <source-file src="src/android/data/LocationDAO.java" target-dir="src/au/com/cathis/plugins/location/data" />
+        <source-file src="src/android/data/sqlite/LocationOpenHelper.java" target-dir="src/au/com/cathis/plugins/location/data/sqlite" />
+        <source-file src="src/android/data/sqlite/SQLiteLocationDAO.java" target-dir="src/au/com/cathis/plugins/location/data/sqlite" />
         
         <config-file target="AndroidManifest.xml" parent="/manifest/application">
-            <service android:name="au.com.cathis.plugin.message.immobilize.PositionUpdateService" android:enabled="true" android:process=":remote" />
-            <service android:name="au.com.cathis.plugin.message.immobilize.WatchImmobilizeService" android:enabled="true" android:process=":remote" />
+            <service android:name="au.com.cathis.plugins.location.PositionUpdateService" android:enabled="true" android:process=":remote" />
+            <service android:name="au.com.cathis.plugins.location.WatchImmobilizeService" android:enabled="true" android:process=":remote" />
         </config-file>
 
         <config-file target="AndroidManifest.xml" parent="/manifest">
@@ -46,7 +46,7 @@
         </config-file>
         <config-file target="res/xml/config.xml" parent="/*">
             <feature name="Immobilize">
-                <param name="android-package" value="au.com.cathis.plugin.message.immobilize.ImmobilizePlugin"/>
+                <param name="android-package" value="au.com.cathis.plugins.location.ImmobilizePlugin"/>
             </feature>
         </config-file> 
      </platform>          
