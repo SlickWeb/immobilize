@@ -1,4 +1,4 @@
-package au.com.cathis.plugin.message.immobilize.data.sqlite;
+package au.com.cathis.plugins.location.data.sqlite;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -12,8 +12,8 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.util.Log;
-import au.com.cathis.plugin.message.immobilize.data.Location;
-import au.com.cathis.plugin.message.immobilize.data.LocationDAO;
+import au.com.cathis.plugins.location.data.Location;
+import au.com.cathis.plugins.location.data.LocationDAO;
 
 public class SQLiteLocationDAO implements LocationDAO {
 	public static final String DATE_FORMAT = "yyyy-MM-dd'T'HH:mm'Z'";
