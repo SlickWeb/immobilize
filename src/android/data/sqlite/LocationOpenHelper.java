@@ -1,4 +1,4 @@
-package au.com.cathis.plugin.message.immobilize.data.sqlite;
+package au.com.cathis.plugins.location.data.sqlite;
 
 
 import android.content.Context;
