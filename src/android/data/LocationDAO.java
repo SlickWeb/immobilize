@@ -1,4 +1,4 @@
-package au.com.cathis.plugin.message.immobilize.data;
+package au.com.cathis.plugins.location.data;
 
 import java.util.Date;
 
