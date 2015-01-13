@@ -1,4 +1,4 @@
-cordova.define("au.com.cathis.plugin.message.immobilize.Immobilize", function(require, exports, module) { var exec = require("cordova/exec");
+var exec = require("cordova/exec");
 module.exports = {
 
     /**
@@ -76,5 +76,3 @@ module.exports = {
             []);
     }
 };
-
-});
