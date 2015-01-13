@@ -1,4 +1,4 @@
-package au.com.cathis.plugin.message.immobilize;
+package au.com.cathis.plugins.location;
 
 import android.annotation.TargetApi;
 import android.app.*;
@@ -14,8 +14,8 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.*;
 import android.util.Log;
-import au.com.cathis.plugin.message.immobilize.data.DAOFactory;
-import au.com.cathis.plugin.message.immobilize.data.LocationDAO;
+import au.com.cathis.plugins.location.data.DAOFactory;
+import au.com.cathis.plugins.location.data.LocationDAO;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
@@ -29,7 +29,7 @@ import java.util.Iterator;
 public class WatchImmobilizeService extends Service implements LocationListener {
 
     private static final String TAG = "WatchImmobilizeService";
-    private static final String WATCH_LOCATION_UPDATE_ACTION = "au.com.cathis.plugin.message.immobilize.WATCH_LOCATION_UPDATE_ACTION";
+    private static final String WATCH_LOCATION_UPDATE_ACTION = "au.com.cathis.plugins.location.WATCH_LOCATION_UPDATE_ACTION";
 
     private PowerManager.WakeLock wakeLock;
     private Location lastLocation;
@@ -280,7 +280,7 @@ public class WatchImmobilizeService extends Service implements LocationListener 
         Log.d(TAG, "- onStatusChanged: " + provider + ", status: " + status);
     }
 
-    private boolean postLocation(au.com.cathis.plugin.message.immobilize.data.Location l, LocationDAO dao) {
+    private boolean postLocation(au.com.cathis.plugins.location.data.Location l, LocationDAO dao) {
         if (l == null) {
             Log.w(TAG, "postLocation: null location");
             return false;
@@ -327,7 +327,7 @@ public class WatchImmobilizeService extends Service implements LocationListener 
 
     private void persistLocation(Location location) {
         LocationDAO dao = DAOFactory.createLocationDAO(this.getApplicationContext());
-        au.com.cathis.plugin.message.immobilize.data.Location savedLocation = au.com.cathis.plugin.message.immobilize.data.Location.fromAndroidLocation(location);
+        au.com.cathis.plugins.location.data.Location savedLocation = au.com.cathis.plugins.location.data.Location.fromAndroidLocation(location);
 
         if (dao.persistLocation(savedLocation)) {
             Log.d(TAG, "Persisted Location: " + savedLocation);
@@ -385,7 +385,7 @@ public class WatchImmobilizeService extends Service implements LocationListener 
         protected Boolean doInBackground(Object...objects) {
             Log.d(TAG, "Executing PostLocationTask#doInBackground");
             LocationDAO locationDAO = DAOFactory.createLocationDAO(WatchImmobilizeService.this.getApplicationContext());
-            for (au.com.cathis.plugin.message.immobilize.data.Location savedLocation : locationDAO.getAllLocations()) {
+            for (au.com.cathis.plugins.location.data.Location savedLocation : locationDAO.getAllLocations()) {
                 Log.d(TAG, "Posting saved location");
                 if (postLocation(savedLocation, locationDAO)) {
                     locationDAO.deleteLocation(savedLocation);
