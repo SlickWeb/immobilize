@@ -5,7 +5,6 @@
 #import "Immobilize.h"
 #import <Cordova/CDVJSON.h>
 #import <Cordova/CDV.h>
-#import "RoutingHTTPServer.h"
 
 
 @implementation Immobilize {
@@ -315,21 +314,36 @@
     // test that the horizontal accuracy does not indicate an invalid measurement
     if (location.horizontalAccuracy < 0) return;
     
+    if (lastUpdateLocation == NULL){
+        lastUpdateLocation = location;
+    }
+    
     CLLocationDistance distance = [location distanceFromLocation:lastUpdateLocation];
     NSLog(@"- Immobilize (distance: %f)", distance);
-    if(distance > distanceFilter){
-        NSURL *url = [NSURL URLWithString:url];
-	NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
-	[req setHTTPMethod:@"POST"];
-	[req setHTTPBody:nil];
-	NSHTTPURLResponse __autoreleasing *response;
-	NSError __autoreleasing *error;
-	[NSURLConnection sendSynchronousRequest:req returningResponse:&response error:&error];
-	if (error == nil && response.statusCode == 200) {
-	    NSLog(@"- Immobilize SUCCESS RESPONSE");
-	} else {
-	    // Process error
-	}
+    if(lastUpdateLocation == NULL || distance > distanceFilter){
+        NSURL *nurl = [NSURL URLWithString:url];
+        NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:nurl];
+        [req setHTTPMethod:@"POST"];
+        [req setValue:@"application/json" forHTTPHeaderField:@"Content-type"];
+        NSString *dataString = @"{\"latitude\":";
+        NSNumber *latitudeNumber = [NSNumber numberWithDouble:location.coordinate.latitude];
+        dataString = [dataString stringByAppendingString:[latitudeNumber stringValue]];
+        dataString = [dataString stringByAppendingString:@",\"longitude\":"];
+        NSNumber *longitudeNumber = [NSNumber numberWithDouble:location.coordinate.longitude];
+        dataString = [dataString stringByAppendingString:[longitudeNumber stringValue]];
+        dataString = [dataString stringByAppendingString:@"}"];
+        NSLog(@"- Sending %@", dataString);
+        //NSData *data = [dataString dataUsingEncoding:NSUTF8StringEncoding];
+        //NSMutableData *body = [data mutableCopy];
+        [req setHTTPBody:[dataString dataUsingEncoding:NSUTF8StringEncoding]];
+        NSHTTPURLResponse __autoreleasing *response;
+        NSError __autoreleasing *error;
+        [NSURLConnection sendSynchronousRequest:req returningResponse:&response error:&error];
+        if (error == nil && response.statusCode == 200) {
+            NSLog(@"- Immobilize SUCCESS RESPONSE");
+        } else {
+            NSLog(@"- Immobilize ERROR RESPONSE: %@",error.localizedDescription);
+        }
         lastUpdateLocation = location;
     }
     
