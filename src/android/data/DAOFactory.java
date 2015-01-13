@@ -1,7 +1,7 @@
-package au.com.cathis.plugin.message.immobilize.data;
+package au.com.cathis.plugins.location.data;
 
 import android.content.Context;
-import au.com.cathis.plugin.message.immobilize.data.sqlite.SQLiteLocationDAO;
+import au.com.cathis.plugins.location.sqlite.SQLiteLocationDAO;
 
 public abstract class DAOFactory {
 	public static LocationDAO createLocationDAO(Context context) {
