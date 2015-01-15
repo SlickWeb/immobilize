@@ -11,10 +11,14 @@
     BOOL isDebugging;
     BOOL enabled;
     BOOL isUpdatingLocation;
+    BOOL isWatchingLocation;
     BOOL stopOnTerminate;
 
     NSString *token;
     NSString *url;
+    NSString *apiToken;
+    NSString *watchUrl;
+    NSString *watchApiToken;
     UIBackgroundTaskIdentifier bgTask;
     NSDate *lastBgTaskAt;
 
@@ -29,6 +33,8 @@
     CDVLocationData *locationData;
     CLLocation *lastLocation;
     CLLocation *lastUpdateLocation;
+    CLLocation *startedWatchLocation;
+    NSNumber startedWatchTime;
     NSMutableArray *locationQueue;
 
     NSDate *suspendedAt;
@@ -42,12 +48,17 @@
     NSInteger maxSpeedAcquistionAttempts;
 
     NSInteger distanceFilter;
+    NSInteger watchDistanceFilter;
     NSInteger locationTimeout;
+    NSInteger watchLocationTimeout;
     NSInteger desiredAccuracy;
+    NSInteger watchDesiredAccuracy;
     NSMutableArray *params;
     NSMutableArray *headers;
     
     BOOL isUpdateEnabled;
+    BOOL isWatchEnabled;
+    BOOL immobilizeReported;
 }
 
 @synthesize syncCallbackId;
@@ -68,6 +79,8 @@
     stopOnTerminate = NO;
     isDebugging = YES;
     isUpdateEnabled = NO;
+    isWatchEnabled = NO;
+    immobilizeReported = NO;
 
     maxStationaryLocationAttempts   = 4;
     maxSpeedAcquistionAttempts      = 3;
@@ -82,12 +95,15 @@
 
 - (void) update:(CDVInvokedUrlCommand*)command
 {
-    if(!isUpdateEnabled){
+
 	url = [command.arguments objectAtIndex: 1];
+	apiToken = [command.arguments objectAtIndex: 2];
         distanceFilter      = [[command.arguments objectAtIndex: 0] intValue];
         locationTimeout     = 15;
         desiredAccuracy     = [self decodeDesiredAccuracy: 10];
-        
+
+    if(!isUpdateEnabled && !isWatchEnabled){
+
         self.syncCallbackId = command.callbackId;
         
         locationManager.pausesLocationUpdatesAutomatically = YES;
@@ -99,10 +115,38 @@
         NSLog(@"  - locationTimeout: %ld", (long)locationTimeout);
         NSLog(@"  - desiredAccuracy: %ld", (long)desiredAccuracy);
         
-        isUpdateEnabled = YES;
-        
         [self start];
     }
+    
+    isUpdateEnabled = YES;
+}
+
+- (void) watchImmobilise:(CDVInvokedUrlCommand*)command
+{
+
+    	watchUrl = [command.arguments objectAtIndex: 2];
+    	watchApiToken = [command.arguments objectAtIndex: 3];
+        watchDistanceFilter      = [[command.arguments objectAtIndex: 0] intValue];
+        watchLocationTimeout     = [[command.arguments objectAtIndex: 1] intValue];
+        watchDesiredAccuracy     = [self decodeDesiredAccuracy: 10];
+
+    if(!isWatchEnabled && !isUpdateEnabled){
+    
+    	self.syncCallbackId = command.callbackId;
+        
+        locationManager.pausesLocationUpdatesAutomatically = YES;
+        locationManager.distanceFilter = watchDistanceFilter; // meters
+        locationManager.desiredAccuracy = watchDesiredAccuracy;
+        
+        NSLog(@"  - watchUrl: %@", watchUrl);
+        NSLog(@"  - watchDistanceFilter: %ld", (long)watchDistanceFilter);
+        NSLog(@"  - watchLocationTimeout: %ld", (long)watchLocationTimeout);
+        NSLog(@"  - watchDesiredAccuracy: %ld", (long)watchDesiredAccuracy);
+       
+        [self start];
+    }
+    
+    isWatchEnabled = YES;
 }
 
 - (void) flushQueue
@@ -169,13 +213,33 @@
 
 - (void) stopUpdate:(CDVInvokedUrlCommand*)command
 {
-    NSLog(@"- Immobilize stop");
+    NSLog(@"- Immobilize stop update");
     enabled = NO;
     isMoving = NO;
     isUpdateEnabled = NO;
+    isWatchEnabled = NO;
 
-    [self stopUpdatingLocation];
-    [locationManager stopMonitoringSignificantLocationChanges];
+    if(!isWatchEnabled && !isUpdateEnabled){
+	    [self stopUpdatingLocation];
+	    [locationManager stopMonitoringSignificantLocationChanges];    
+    }
+    CDVPluginResult* result = nil;
+    result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+    [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
+
+}
+
+- (void) stopWatch:(CDVInvokedUrlCommand*)command
+{
+    NSLog(@"- Immobilize stop watch");
+    enabled = NO;
+    isMoving = NO;
+    isWatchEnabled = NO;
+
+    if(!isWatchEnabled && !isUpdateEnabled){
+	    [self stopUpdatingLocation];
+	    [locationManager stopMonitoringSignificantLocationChanges];    
+    }
     CDVPluginResult* result = nil;
     result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
@@ -281,6 +345,7 @@
         enabled = NO;
         isMoving = NO;
         isUpdateEnabled = NO;
+        isWatchEnabled = NO;
 
         [self stopUpdatingLocation];
         [locationManager stopMonitoringSignificantLocationChanges];
@@ -293,7 +358,7 @@
     NSLog(@"- Immobilize didUpdateLocations (isMoving: %d)", isMoving);
 
     locationError = nil;
-    if (isMoving && !isUpdatingLocation) {
+    if (isMoving && !isUpdatingLocation && !isWatchingLocation) {
         [self startUpdatingLocation];
     }
 
@@ -317,34 +382,94 @@
     if (lastUpdateLocation == NULL){
         lastUpdateLocation = location;
     }
-    
+
     CLLocationDistance distance = [location distanceFromLocation:lastUpdateLocation];
+    if(startedWatchLocation != NULL){
+    	CLLocationDistance watchDistance = [location distanceFromLocation:startedWatchLocation];
+    }else{
+    	CLLocationDistance watchDistance = [location distanceFromLocation:lastLocation];
+    }
+    
     NSLog(@"- Immobilize (distance: %f)", distance);
-    if(lastUpdateLocation == NULL || distance > distanceFilter){
-        NSURL *nurl = [NSURL URLWithString:url];
-        NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:nurl];
-        [req setHTTPMethod:@"POST"];
-        [req setValue:@"application/json" forHTTPHeaderField:@"Content-type"];
-        NSString *dataString = @"{\"latitude\":";
-        NSNumber *latitudeNumber = [NSNumber numberWithDouble:location.coordinate.latitude];
-        dataString = [dataString stringByAppendingString:[latitudeNumber stringValue]];
-        dataString = [dataString stringByAppendingString:@",\"longitude\":"];
-        NSNumber *longitudeNumber = [NSNumber numberWithDouble:location.coordinate.longitude];
-        dataString = [dataString stringByAppendingString:[longitudeNumber stringValue]];
-        dataString = [dataString stringByAppendingString:@"}"];
-        NSLog(@"- Sending %@", dataString);
-        //NSData *data = [dataString dataUsingEncoding:NSUTF8StringEncoding];
-        //NSMutableData *body = [data mutableCopy];
-        [req setHTTPBody:[dataString dataUsingEncoding:NSUTF8StringEncoding]];
-        NSHTTPURLResponse __autoreleasing *response;
-        NSError __autoreleasing *error;
-        [NSURLConnection sendSynchronousRequest:req returningResponse:&response error:&error];
-        if (error == nil && response.statusCode == 200) {
-            NSLog(@"- Immobilize SUCCESS RESPONSE");
-        } else {
-            NSLog(@"- Immobilize ERROR RESPONSE: %@",error.localizedDescription);
-        }
-        lastUpdateLocation = location;
+    NSLog(@"- Immobilize (watchDistance: %f)", watchDistance);
+    if(isUpdatingLocation){
+	    if(lastUpdateLocation == NULL || distance > distanceFilter){
+	        NSURL *nurl = [NSURL URLWithString:url];
+	        NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:nurl];
+	        [req setHTTPMethod:@"POST"];
+	        [req setValue:@"application/json" forHTTPHeaderField:@"Content-type"];
+	        [req setValue:apiToken forHTTPHeaderField:@"access_token"];
+	        [req setValue:@"Cache-Control" forHTTPHeaderField:@"no-cache"];
+	        NSString *dataString = @"{\"latitude\":";
+	        NSNumber *latitudeNumber = [NSNumber numberWithDouble:location.coordinate.latitude];
+	        dataString = [dataString stringByAppendingString:[latitudeNumber stringValue]];
+	        dataString = [dataString stringByAppendingString:@",\"longitude\":"];
+	        NSNumber *longitudeNumber = [NSNumber numberWithDouble:location.coordinate.longitude];
+	        dataString = [dataString stringByAppendingString:[longitudeNumber stringValue]];
+	        dataString = [dataString stringByAppendingString:@"}"];
+	        NSLog(@"- Sending %@", dataString);
+	        //NSData *data = [dataString dataUsingEncoding:NSUTF8StringEncoding];
+	        //NSMutableData *body = [data mutableCopy];
+	        [req setHTTPBody:[dataString dataUsingEncoding:NSUTF8StringEncoding]];
+	        NSHTTPURLResponse __autoreleasing *response;
+	        NSError __autoreleasing *error;
+	        [NSURLConnection sendSynchronousRequest:req returningResponse:&response error:&error];
+	        if (error == nil && response.statusCode == 200) {
+	            NSLog(@"- Immobilize SUCCESS RESPONSE");
+	        } else {
+	            NSLog(@"- Immobilize ERROR RESPONSE: %@",error.localizedDescription);
+	        }
+	        lastUpdateLocation = location;
+	    }    
+    }
+    if(isWatchingLocation){
+    	
+    	if(watchDistance < watchDistanceFilter){
+    		
+    	    if (startedWatchLocation == NULL){
+	        startedWatchLocation = lastLocation;
+	    }
+	    if (startedWatchTime == NULL){
+	        startedWatchTime = [[NSDate date] timeIntervalSince1970];
+	    }
+    	
+    	        NSNumber timeDifference = [[NSDate date] timeIntervalSince1970] - (startedWatchTime*1000);
+	    	if(timeDifference > watchLocationTimeout && !immobilizeReported){
+	    		immobilizeReported = YES;
+		        NSURL *nurl = [NSURL URLWithString:watchUrl];
+		        NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:nurl];
+		        [req setHTTPMethod:@"POST"];
+		        [req setValue:@"application/json" forHTTPHeaderField:@"Content-type"];
+		        [req setValue:watchApiToken forHTTPHeaderField:@"access_token"];
+		        [req setValue:@"Cache-Control" forHTTPHeaderField:@"no-cache"];
+		        NSString *dataString = @"{\"latitude\":";
+		        NSNumber *latitudeNumber = [NSNumber numberWithDouble:location.coordinate.latitude];
+		        dataString = [dataString stringByAppendingString:[latitudeNumber stringValue]];
+		        dataString = [dataString stringByAppendingString:@",\"longitude\":"];
+		        NSNumber *longitudeNumber = [NSNumber numberWithDouble:location.coordinate.longitude];
+		        dataString = [dataString stringByAppendingString:[longitudeNumber stringValue]];
+		        dataString = [dataString stringByAppendingString:@",\"accuracy\":"];
+		        NSNumber *accuracyNumber = [NSNumber numberWithDouble:location.coordinate.accuracy];
+		        dataString = [dataString stringByAppendingString:[accuracyNumber stringValue]];
+		        dataString = [dataString stringByAppendingString:@"}"];
+		        NSLog(@"- Sending %@", dataString);
+		        //NSData *data = [dataString dataUsingEncoding:NSUTF8StringEncoding];
+		        //NSMutableData *body = [data mutableCopy];
+		        [req setHTTPBody:[dataString dataUsingEncoding:NSUTF8StringEncoding]];
+		        NSHTTPURLResponse __autoreleasing *response;
+		        NSError __autoreleasing *error;
+		        [NSURLConnection sendSynchronousRequest:req returningResponse:&response error:&error];
+		        if (error == nil && response.statusCode == 200) {
+		            NSLog(@"- Immobilize SUCCESS RESPONSE");
+		        } else {
+		            NSLog(@"- Immobilize ERROR RESPONSE: %@",error.localizedDescription);
+		        }	    			
+	    	}
+    	}else{
+    		immobilizeReported = NO;
+    		startedWatchLocation = NULL;
+    		startedWatchTime = NULL;
+    	}	
     }
     
     lastLocation = location;
