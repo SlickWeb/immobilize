@@ -101,6 +101,7 @@
     distanceFilter      = [[command.arguments objectAtIndex: 0] intValue];
     locationTimeout     = 15;
     desiredAccuracy     = [self decodeDesiredAccuracy: 10];
+    enabled = YES;
     
     if(!isUpdateEnabled && !isWatchEnabled){
         
@@ -129,13 +130,14 @@
     watchDistanceFilter      = [[command.arguments objectAtIndex: 0] intValue];
     watchLocationTimeout     = [[command.arguments objectAtIndex: 1] intValue];
     watchDesiredAccuracy     = [self decodeDesiredAccuracy: 10];
+    enabled = YES;
     
-    if(!isWatchEnabled && !isUpdateEnabled){
+    if(!isWatchEnabled){
         
     	self.syncCallbackId = command.callbackId;
         
         locationManager.pausesLocationUpdatesAutomatically = YES;
-        locationManager.distanceFilter = watchDistanceFilter; // meters
+        locationManager.distanceFilter = 0; // meters
         locationManager.desiredAccuracy = watchDesiredAccuracy;
         
         NSLog(@"  - watchUrl: %@", watchUrl);
@@ -205,7 +207,7 @@
     
     NSLog(@"- Immobilize start (background? %d)", state);
     
-    [locationManager startMonitoringSignificantLocationChanges];
+    [self startUpdatingLocation];
     if (state == UIApplicationStateBackground) {
         [self setPace:isMoving];
     }
@@ -217,7 +219,6 @@
     enabled = NO;
     isMoving = NO;
     isUpdateEnabled = NO;
-    isWatchEnabled = NO;
     
     if(!isWatchEnabled && !isUpdateEnabled){
 	    [self stopUpdatingLocation];
@@ -270,18 +271,7 @@
     isAcquiringSpeed                = NO;
     locationAcquisitionAttempts     = 0;
     
-    if (isMoving) {
-        isAcquiringSpeed = YES;
-    } else {
-        isAcquiringStationaryLocation   = YES;
-    }
-    if (isAcquiringSpeed || isAcquiringStationaryLocation) {
-        // Crank up the GPS power temporarily to get a good fix on our current location
-        [self stopUpdatingLocation];
-        locationManager.distanceFilter = kCLDistanceFilterNone;
-        locationManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation;
-        [self startUpdatingLocation];
-    }
+    [self startUpdatingLocation];
 }
 
 -(NSMutableDictionary*) locationToHash:(CLLocation*)location
@@ -358,9 +348,6 @@
     NSLog(@"- Immobilize didUpdateLocations (isMoving: %d)", isMoving);
     
     locationError = nil;
-    if (isMoving && !isUpdatingLocation && !isWatchingLocation) {
-        [self startUpdatingLocation];
-    }
     
     CLLocation *location = [locations lastObject];
     
@@ -516,14 +503,6 @@
 {
     NSLog(@"- Immobilize#sync");
     NSLog(@"  type: %@, position: %@,%@ speed: %@", [data objectForKey:@"location_type"], [data objectForKey:@"latitude"], [data objectForKey:@"longitude"], [data objectForKey:@"speed"]);
-    if (isDebugging) {
-        [self notify:[NSString stringWithFormat:@"Location update: %s\nSPD: %0.0f | DF: %ld | ACY: %0.0f",
-                      ((isMoving) ? "MOVING" : "STATIONARY"),
-                      [[data objectForKey:@"speed"] doubleValue],
-                      (long) locationManager.distanceFilter,
-                      [[data objectForKey:@"accuracy"] doubleValue]]];
-        
-    }
     
     // Build a resultset for javascript callback.
     NSString *locationType = [data objectForKey:@"location_type"];
@@ -538,10 +517,6 @@
     }
 }
 
-
-- (bool) stationaryRegionContainsLocation:(CLLocation*)location {
-    return NO;
-}
 - (void) stopBackgroundTask
 {
     UIApplication *app = [UIApplication sharedApplication];
@@ -553,18 +528,6 @@
     }
     [self flushQueue];
 }
-/**
- * Called when user exits their stationary radius (ie: they walked ~50m away from their last recorded location.
- * - turn on more aggressive location monitoring.
- */
-- (void)locationManager:(CLLocationManager *)manager didExitRegion:(CLRegion *)region
-{
-    NSLog(@"- Immobilize exit region");
-    if (isDebugging) {
-        [self notify:@"Exit stationary region"];
-    }
-    [self setPace:YES];
-}
 
 /**
  * 1. turn off std location services
@@ -574,9 +537,6 @@
 - (void)locationManagerDidPauseLocationUpdates:(CLLocationManager *)manager
 {
     NSLog(@"- Immobilize paused location updates");
-    if (isDebugging) {
-        [self notify:@"Stop detected"];
-    }
     if (locationError) {
         isMoving = NO;
         [self stopUpdatingLocation];
@@ -593,18 +553,12 @@
 - (void)locationManagerDidResumeLocationUpdates:(CLLocationManager *)manager
 {
     NSLog(@"- Immobilize resume location updates");
-    if (isDebugging) {
-        [self notify:@"Resume location updates"];
-    }
     [self setPace:YES];
 }
 
 - (void)locationManager:(CLLocationManager *)manager didFailWithError:(NSError *)error
 {
     NSLog(@"- Immobilize locationManager failed:  %@", error);
-    if (isDebugging) {
-        [self notify:[NSString stringWithFormat:@"Location error: %@", error.localizedDescription]];
-    }
     
     locationError = error;
     
@@ -630,6 +584,8 @@
 {
     [locationManager stopUpdatingLocation];
     isUpdatingLocation = NO;
+    isUpdateEnabled = NO;
+    isWatchEnabled = NO;
 }
 
 - (void) startUpdatingLocation
