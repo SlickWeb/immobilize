@@ -11,6 +11,8 @@
 
 - (void) update:(CDVInvokedUrlCommand*)command;
 - (void) stopUpdate:(CDVInvokedUrlCommand*)command;
+- (void) watchImmobilise:(CDVInvokedUrlCommand*)command;
+- (void) stopWatch:(CDVInvokedUrlCommand*)command;
 - (void) finish:(CDVInvokedUrlCommand*)command;
 - (void) onPaceChange:(CDVInvokedUrlCommand*)command;
 - (void) onResume:(NSNotification *)notification;
