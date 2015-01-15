@@ -13,7 +13,7 @@
     BOOL isUpdatingLocation;
     BOOL isWatchingLocation;
     BOOL stopOnTerminate;
-
+    
     NSString *token;
     NSString *url;
     NSString *apiToken;
@@ -21,32 +21,32 @@
     NSString *watchApiToken;
     UIBackgroundTaskIdentifier bgTask;
     NSDate *lastBgTaskAt;
-
+    
     NSError *locationError;
-
+    
     BOOL isMoving;
-
+    
     NSNumber *maxBackgroundHours;
     CLLocationManager *locationManager;
     UILocalNotification *localNotification;
-
+    
     CDVLocationData *locationData;
     CLLocation *lastLocation;
     CLLocation *lastUpdateLocation;
     CLLocation *startedWatchLocation;
-    NSNumber startedWatchTime;
+    NSDate *startedWatchTime;
     NSMutableArray *locationQueue;
-
+    
     NSDate *suspendedAt;
-
+    
     NSInteger locationAcquisitionAttempts;
-
+    
     BOOL isAcquiringStationaryLocation;
     NSInteger maxStationaryLocationAttempts;
-
+    
     BOOL isAcquiringSpeed;
     NSInteger maxSpeedAcquistionAttempts;
-
+    
     NSInteger distanceFilter;
     NSInteger watchDistanceFilter;
     NSInteger locationTimeout;
@@ -68,12 +68,12 @@
     // background location cache, for when no network is detected.
     locationManager = [[CLLocationManager alloc] init];
     locationManager.delegate = self;
-
+    
     localNotification = [[UILocalNotification alloc] init];
     localNotification.timeZone = [NSTimeZone defaultTimeZone];
-
+    
     locationQueue = [[NSMutableArray alloc] init];
-
+    
     isMoving = NO;
     isUpdatingLocation = NO;
     stopOnTerminate = NO;
@@ -81,29 +81,29 @@
     isUpdateEnabled = NO;
     isWatchEnabled = NO;
     immobilizeReported = NO;
-
+    
     maxStationaryLocationAttempts   = 4;
     maxSpeedAcquistionAttempts      = 3;
-
+    
     bgTask = UIBackgroundTaskInvalid;
-
+    
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onSuspend:) name:UIApplicationDidEnterBackgroundNotification object:nil];
-
+    
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(onResume:) name:UIApplicationWillEnterForegroundNotification object:nil];
     
 }
 
 - (void) update:(CDVInvokedUrlCommand*)command
 {
-
+    
 	url = [command.arguments objectAtIndex: 1];
 	apiToken = [command.arguments objectAtIndex: 2];
-        distanceFilter      = [[command.arguments objectAtIndex: 0] intValue];
-        locationTimeout     = 15;
-        desiredAccuracy     = [self decodeDesiredAccuracy: 10];
-
+    distanceFilter      = [[command.arguments objectAtIndex: 0] intValue];
+    locationTimeout     = 15;
+    desiredAccuracy     = [self decodeDesiredAccuracy: 10];
+    
     if(!isUpdateEnabled && !isWatchEnabled){
-
+        
         self.syncCallbackId = command.callbackId;
         
         locationManager.pausesLocationUpdatesAutomatically = YES;
@@ -123,15 +123,15 @@
 
 - (void) watchImmobilise:(CDVInvokedUrlCommand*)command
 {
-
-    	watchUrl = [command.arguments objectAtIndex: 2];
-    	watchApiToken = [command.arguments objectAtIndex: 3];
-        watchDistanceFilter      = [[command.arguments objectAtIndex: 0] intValue];
-        watchLocationTimeout     = [[command.arguments objectAtIndex: 1] intValue];
-        watchDesiredAccuracy     = [self decodeDesiredAccuracy: 10];
-
-    if(!isWatchEnabled && !isUpdateEnabled){
     
+    watchUrl = [command.arguments objectAtIndex: 2];
+    watchApiToken = [command.arguments objectAtIndex: 3];
+    watchDistanceFilter      = [[command.arguments objectAtIndex: 0] intValue];
+    watchLocationTimeout     = [[command.arguments objectAtIndex: 1] intValue];
+    watchDesiredAccuracy     = [self decodeDesiredAccuracy: 10];
+    
+    if(!isWatchEnabled && !isUpdateEnabled){
+        
     	self.syncCallbackId = command.callbackId;
         
         locationManager.pausesLocationUpdatesAutomatically = YES;
@@ -142,7 +142,7 @@
         NSLog(@"  - watchDistanceFilter: %ld", (long)watchDistanceFilter);
         NSLog(@"  - watchLocationTimeout: %ld", (long)watchLocationTimeout);
         NSLog(@"  - watchDesiredAccuracy: %ld", (long)watchDesiredAccuracy);
-       
+        
         [self start];
     }
     
@@ -165,7 +165,7 @@
     if ([locationQueue count] > 0) {
         NSMutableDictionary *data = [locationQueue lastObject];
         [locationQueue removeObject:data];
-
+        
         // Create a background-task and delegate to Javascript for syncing location
         bgTask = [self createBackgroundTask];
         [self.commandDelegate runInBackground:^{
@@ -202,9 +202,9 @@
 {
     enabled = YES;
     UIApplicationState state = [[UIApplication sharedApplication] applicationState];
-
+    
     NSLog(@"- Immobilize start (background? %d)", state);
-
+    
     [locationManager startMonitoringSignificantLocationChanges];
     if (state == UIApplicationStateBackground) {
         [self setPace:isMoving];
@@ -218,15 +218,15 @@
     isMoving = NO;
     isUpdateEnabled = NO;
     isWatchEnabled = NO;
-
+    
     if(!isWatchEnabled && !isUpdateEnabled){
 	    [self stopUpdatingLocation];
-	    [locationManager stopMonitoringSignificantLocationChanges];    
+	    [locationManager stopMonitoringSignificantLocationChanges];
     }
     CDVPluginResult* result = nil;
     result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
-
+    
 }
 
 - (void) stopWatch:(CDVInvokedUrlCommand*)command
@@ -235,15 +235,15 @@
     enabled = NO;
     isMoving = NO;
     isWatchEnabled = NO;
-
+    
     if(!isWatchEnabled && !isUpdateEnabled){
 	    [self stopUpdatingLocation];
-	    [locationManager stopMonitoringSignificantLocationChanges];    
+	    [locationManager stopMonitoringSignificantLocationChanges];
     }
     CDVPluginResult* result = nil;
     result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
-
+    
 }
 
 /**
@@ -269,7 +269,7 @@
     isAcquiringStationaryLocation   = NO;
     isAcquiringSpeed                = NO;
     locationAcquisitionAttempts     = 0;
-
+    
     if (isMoving) {
         isAcquiringSpeed = YES;
     } else {
@@ -288,7 +288,7 @@
 {
     NSMutableDictionary *returnInfo;
     returnInfo = [NSMutableDictionary dictionaryWithCapacity:10];
-
+    
     NSNumber* timestamp = [NSNumber numberWithDouble:([location.timestamp timeIntervalSince1970] * 1000)];
     [returnInfo setObject:timestamp forKey:@"timestamp"];
     [returnInfo setObject:[NSNumber numberWithDouble:location.speed] forKey:@"speed"];
@@ -298,7 +298,7 @@
     [returnInfo setObject:[NSNumber numberWithDouble:location.altitude] forKey:@"altitude"];
     [returnInfo setObject:[NSNumber numberWithDouble:location.coordinate.latitude] forKey:@"latitude"];
     [returnInfo setObject:[NSNumber numberWithDouble:location.coordinate.longitude] forKey:@"longitude"];
-
+    
     return returnInfo;
 }
 /**
@@ -317,7 +317,7 @@
 {
     NSLog(@"- Immobilize suspend (enabled? %d)", enabled);
     suspendedAt = [NSDate date];
-
+    
     if (enabled) {
         [self setPace: isMoving];
     }
@@ -341,12 +341,12 @@
     NSLog(@"- Immobilize appTerminate");
     if (enabled && stopOnTerminate) {
         NSLog(@"- Immobilize stoping on terminate");
-
+        
         enabled = NO;
         isMoving = NO;
         isUpdateEnabled = NO;
         isWatchEnabled = NO;
-
+        
         [self stopUpdatingLocation];
         [locationManager stopMonitoringSignificantLocationChanges];
     }
@@ -356,12 +356,12 @@
 -(void) locationManager:(CLLocationManager *)manager didUpdateLocations:(NSArray *)locations
 {
     NSLog(@"- Immobilize didUpdateLocations (isMoving: %d)", isMoving);
-
+    
     locationError = nil;
     if (isMoving && !isUpdatingLocation && !isWatchingLocation) {
         [self startUpdatingLocation];
     }
-
+    
     CLLocation *location = [locations lastObject];
     
     NSLog(@"- Immobilize didUpdateLocations (location latitude: %g)", location.coordinate.latitude);
@@ -371,28 +371,29 @@
         // Perhaps our GPS signal was interupted, re-acquire a stationaryLocation now.
         [self setPace: NO];
     }
-
+    
     // test the age of the location measurement to determine if the measurement is cached
     // in most cases you will not want to rely on cached measurements
     if ([self locationAge:location] > 5.0) return;
-
+    
     // test that the horizontal accuracy does not indicate an invalid measurement
     if (location.horizontalAccuracy < 0) return;
     
     if (lastUpdateLocation == NULL){
         lastUpdateLocation = location;
     }
-
+    
     CLLocationDistance distance = [location distanceFromLocation:lastUpdateLocation];
+    CLLocationDistance watchDistance;
     if(startedWatchLocation != NULL){
-    	CLLocationDistance watchDistance = [location distanceFromLocation:startedWatchLocation];
+    	watchDistance = [location distanceFromLocation:startedWatchLocation];
     }else{
-    	CLLocationDistance watchDistance = [location distanceFromLocation:lastLocation];
+    	watchDistance = [location distanceFromLocation:lastLocation];
     }
     
     NSLog(@"- Immobilize (distance: %f)", distance);
     NSLog(@"- Immobilize (watchDistance: %f)", watchDistance);
-    if(isUpdatingLocation){
+    if(isUpdateEnabled){
 	    if(lastUpdateLocation == NULL || distance > distanceFilter){
 	        NSURL *nurl = [NSURL URLWithString:url];
 	        NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:nurl];
@@ -420,60 +421,69 @@
 	            NSLog(@"- Immobilize ERROR RESPONSE: %@",error.localizedDescription);
 	        }
 	        lastUpdateLocation = location;
-	    }    
+	    }
     }
-    if(isWatchingLocation){
+    if(isWatchEnabled){
     	
     	if(watchDistance < watchDistanceFilter){
-    		
-    	    if (startedWatchLocation == NULL){
-	        startedWatchLocation = lastLocation;
-	    }
-	    if (startedWatchTime == NULL){
-	        startedWatchTime = [[NSDate date] timeIntervalSince1970];
-	    }
     	
-    	        NSNumber timeDifference = [[NSDate date] timeIntervalSince1970] - (startedWatchTime*1000);
+    	    if (startedWatchLocation == NULL){
+                startedWatchLocation = lastLocation;
+            }
+            if (startedWatchTime == NULL){
+                startedWatchTime = [[NSDate alloc] init];
+            }
+            
+            NSDate *today=[NSDate date];
+            NSTimeInterval dateInSecs = [today timeIntervalSinceReferenceDate];
+            NSNumber *dateInSecsNumber = [NSNumber numberWithDouble:dateInSecs];
+            double dateInSecsDouble = [dateInSecsNumber doubleValue];
+            
+            NSTimeInterval startedWatchInSecs = [startedWatchTime timeIntervalSinceReferenceDate];
+            NSNumber *startedWatchInSecsNumber = [NSNumber numberWithDouble:startedWatchInSecs];
+            double startedWatchInSecsDouble = [startedWatchInSecsNumber doubleValue];
+            
+            double timeDifference = dateInSecsDouble - startedWatchInSecsDouble;
 	    	if(timeDifference > watchLocationTimeout && !immobilizeReported){
-	    		immobilizeReported = YES;
-		        NSURL *nurl = [NSURL URLWithString:watchUrl];
-		        NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:nurl];
-		        [req setHTTPMethod:@"POST"];
-		        [req setValue:@"application/json" forHTTPHeaderField:@"Content-type"];
-		        [req setValue:watchApiToken forHTTPHeaderField:@"access_token"];
-		        [req setValue:@"Cache-Control" forHTTPHeaderField:@"no-cache"];
-		        NSString *dataString = @"{\"latitude\":";
-		        NSNumber *latitudeNumber = [NSNumber numberWithDouble:location.coordinate.latitude];
-		        dataString = [dataString stringByAppendingString:[latitudeNumber stringValue]];
-		        dataString = [dataString stringByAppendingString:@",\"longitude\":"];
-		        NSNumber *longitudeNumber = [NSNumber numberWithDouble:location.coordinate.longitude];
-		        dataString = [dataString stringByAppendingString:[longitudeNumber stringValue]];
-		        dataString = [dataString stringByAppendingString:@",\"accuracy\":"];
-		        NSNumber *accuracyNumber = [NSNumber numberWithDouble:location.coordinate.accuracy];
-		        dataString = [dataString stringByAppendingString:[accuracyNumber stringValue]];
-		        dataString = [dataString stringByAppendingString:@"}"];
-		        NSLog(@"- Sending %@", dataString);
-		        //NSData *data = [dataString dataUsingEncoding:NSUTF8StringEncoding];
-		        //NSMutableData *body = [data mutableCopy];
-		        [req setHTTPBody:[dataString dataUsingEncoding:NSUTF8StringEncoding]];
-		        NSHTTPURLResponse __autoreleasing *response;
-		        NSError __autoreleasing *error;
-		        [NSURLConnection sendSynchronousRequest:req returningResponse:&response error:&error];
-		        if (error == nil && response.statusCode == 200) {
-		            NSLog(@"- Immobilize SUCCESS RESPONSE");
-		        } else {
-		            NSLog(@"- Immobilize ERROR RESPONSE: %@",error.localizedDescription);
-		        }	    			
+	    	immobilizeReported = YES;
+	        NSURL *nurl = [NSURL URLWithString:watchUrl];
+	        NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:nurl];
+	        [req setHTTPMethod:@"POST"];
+	        [req setValue:@"application/json" forHTTPHeaderField:@"Content-type"];
+	        [req setValue:watchApiToken forHTTPHeaderField:@"access_token"];
+	        [req setValue:@"Cache-Control" forHTTPHeaderField:@"no-cache"];
+	        NSString *dataString = @"{\"latitude\":";
+	        NSNumber *latitudeNumber = [NSNumber numberWithDouble:location.coordinate.latitude];
+	        dataString = [dataString stringByAppendingString:[latitudeNumber stringValue]];
+	        dataString = [dataString stringByAppendingString:@",\"longitude\":"];
+	        NSNumber *longitudeNumber = [NSNumber numberWithDouble:location.coordinate.longitude];
+	        dataString = [dataString stringByAppendingString:[longitudeNumber stringValue]];
+	        dataString = [dataString stringByAppendingString:@",\"accuracy\":"];
+	        NSNumber *accuracyNumber = [NSNumber numberWithDouble:location.horizontalAccuracy];
+	        dataString = [dataString stringByAppendingString:[accuracyNumber stringValue]];
+	        dataString = [dataString stringByAppendingString:@"}"];
+	        NSLog(@"- Sending %@", dataString);
+	        //NSData *data = [dataString dataUsingEncoding:NSUTF8StringEncoding];
+	        //NSMutableData *body = [data mutableCopy];
+	        [req setHTTPBody:[dataString dataUsingEncoding:NSUTF8StringEncoding]];
+	        NSHTTPURLResponse __autoreleasing *response;
+	        NSError __autoreleasing *error;
+	        [NSURLConnection sendSynchronousRequest:req returningResponse:&response error:&error];
+	        if (error == nil && response.statusCode == 200) {
+	            NSLog(@"- Immobilize SUCCESS RESPONSE");
+	        } else {
+	            NSLog(@"- Immobilize ERROR RESPONSE: %@",error.localizedDescription);
+	        }
 	    	}
     	}else{
-    		immobilizeReported = NO;
-    		startedWatchLocation = NULL;
-    		startedWatchTime = NULL;
-    	}	
+    	immobilizeReported = NO;
+    	startedWatchLocation = NULL;
+    	startedWatchTime = NULL;
+    	}
     }
     
     lastLocation = location;
-
+    
     if (!isMoving) {
         [self setPace:YES];
     }
@@ -512,9 +522,9 @@
                       [[data objectForKey:@"speed"] doubleValue],
                       (long) locationManager.distanceFilter,
                       [[data objectForKey:@"accuracy"] doubleValue]]];
-
+        
     }
-
+    
     // Build a resultset for javascript callback.
     NSString *locationType = [data objectForKey:@"location_type"];
     if ([locationType isEqualToString:@"current"]) {
@@ -595,9 +605,9 @@
     if (isDebugging) {
         [self notify:[NSString stringWithFormat:@"Location error: %@", error.localizedDescription]];
     }
-
+    
     locationError = error;
-
+    
     switch(error.code) {
         case kCLErrorLocationUnknown:
         case kCLErrorNetwork:
