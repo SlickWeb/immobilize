@@ -1,4 +1,4 @@
-package au.com.cathis.plugins.location;
+package au.com.cathis.plugin.message.immobilize;
 
 import android.annotation.TargetApi;
 import android.app.*;
@@ -11,8 +11,8 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.*;
 import android.util.Log;
-import au.com.cathis.plugins.location.data.DAOFactory;
-import au.com.cathis.plugins.location.data.LocationDAO;
+import au.com.cathis.plugin.message.immobilize.data.DAOFactory;
+import au.com.cathis.plugin.message.immobilize.data.LocationDAO;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
@@ -26,7 +26,7 @@ import java.util.Iterator;
 public class PositionUpdateService extends Service implements LocationListener {
 
     private static final String TAG = "PositionUpdateService";
-    private static final String LOCATION_UPDATE_ACTION = "au.com.cathis.plugins.location.LOCATION_UPDATE_ACTION";
+    private static final String LOCATION_UPDATE_ACTION = "au.com.cathis.plugin.message.immobilize.LOCATION_UPDATE_ACTION";
 
     private PowerManager.WakeLock wakeLock;
 
@@ -49,6 +49,8 @@ public class PositionUpdateService extends Service implements LocationListener {
     private NotificationManager notificationManager;
 
     private LocationDAO dao;
+
+    private boolean firstUpdateSent = false;
 
     @Override
     /**
@@ -133,7 +135,8 @@ public class PositionUpdateService extends Service implements LocationListener {
         Log.i(TAG, "- notificationTitle: " + notificationTitle);
         Log.i(TAG, "- notificationText: " + notificationText);
 
-        this.requestUpdates();
+        this.firstUpdateSent = false;
+        this.requestUpdates(0);
 
         //We want this service to continue running until it is explicitly stopped
         return START_REDELIVER_INTENT;
@@ -157,10 +160,10 @@ public class PositionUpdateService extends Service implements LocationListener {
         return super.stopService(intent);
     }
 
-    private void requestUpdates() {
+    private void requestUpdates( Integer distanceFiltr ) {
 
         locationManager.removeUpdates(this);
-        locationManager.requestLocationUpdates(locationManager.GPS_PROVIDER, locationTimeout * 1000, distanceFilter, this);
+        locationManager.requestLocationUpdates(locationManager.GPS_PROVIDER, locationTimeout * 1000, distanceFiltr, this);
     }
 
     /**
@@ -190,6 +193,11 @@ public class PositionUpdateService extends Service implements LocationListener {
 
     public void onLocationChanged(Location location) {
         Log.d(TAG, "- onLocationChanged: " + location.getLatitude() + "," + location.getLongitude() + ", accuracy: " + location.getAccuracy());
+
+        if(!this.firstUpdateSent){
+            this.requestUpdates(this.distanceFilter);
+            this.firstUpdateSent = true;
+        }
 
         persistLocation(location);
         if (this.isNetworkConnected()) {
@@ -227,7 +235,7 @@ public class PositionUpdateService extends Service implements LocationListener {
         Log.d(TAG, "- onStatusChanged: " + provider + ", status: " + status);
     }
 
-    private boolean postLocation(au.com.cathis.plugins.location.data.Location l, LocationDAO dao) {
+    private boolean postLocation(au.com.cathis.plugin.message.immobilize.data.Location l, LocationDAO dao) {
         if (l == null) {
             Log.w(TAG, "postLocation: null location");
             return false;
@@ -282,7 +290,7 @@ public class PositionUpdateService extends Service implements LocationListener {
 
     private void persistLocation(Location location) {
         dao = DAOFactory.createLocationDAO(this.getApplicationContext());
-        au.com.cathis.plugins.location.data.Location savedLocation = au.com.cathis.plugins.location.data.Location.fromAndroidLocation(location);
+        au.com.cathis.plugin.message.immobilize.data.Location savedLocation = au.com.cathis.plugin.message.immobilize.data.Location.fromAndroidLocation(location);
 
         if (dao.persistLocation(savedLocation)) {
             Log.d(TAG, "Persisted Location: " + savedLocation);
@@ -340,7 +348,7 @@ public class PositionUpdateService extends Service implements LocationListener {
         protected Boolean doInBackground(Object...objects) {
             Log.d(TAG, "Executing PostLocationTask#doInBackground");
             LocationDAO locationDAO = DAOFactory.createLocationDAO(PositionUpdateService.this.getApplicationContext());
-            for (au.com.cathis.plugins.location.data.Location savedLocation : locationDAO.getAllLocations()) {
+            for (au.com.cathis.plugin.message.immobilize.data.Location savedLocation : locationDAO.getAllLocations()) {
                 Log.d(TAG, "Posting saved location");
                 if (postLocation(savedLocation, locationDAO)) {
                     locationDAO.deleteLocation(savedLocation);
