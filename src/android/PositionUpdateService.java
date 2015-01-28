@@ -135,7 +135,7 @@ public class PositionUpdateService extends Service implements LocationListener {
         Log.i(TAG, "- notificationText: " + notificationText);
 
 	this.firstUpdateSent = false;
-        this.requestUpdates(0);
+        this.requestUpdates(0, 0);
 
         //We want this service to continue running until it is explicitly stopped
         return START_REDELIVER_INTENT;
@@ -159,10 +159,10 @@ public class PositionUpdateService extends Service implements LocationListener {
         return super.stopService(intent);
     }
 
-    private void requestUpdates(Integer distanceFiltr) {
+    private void requestUpdates(Integer distanceFiltr, Integer timeout) {
 
         locationManager.removeUpdates(this);
-        locationManager.requestLocationUpdates(locationManager.GPS_PROVIDER, locationTimeout * 1000, distanceFiltr, this);
+        locationManager.requestLocationUpdates(locationManager.GPS_PROVIDER, timeout, distanceFiltr, this);
     }
 
     /**
@@ -193,17 +193,16 @@ public class PositionUpdateService extends Service implements LocationListener {
     public void onLocationChanged(Location location) {
         Log.d(TAG, "- onLocationChanged: " + location.getLatitude() + "," + location.getLongitude() + ", accuracy: " + location.getAccuracy());
 
-        if(!this.firstUpdateSent){
-            this.requestUpdates(this.distanceFilter);
-            this.firstUpdateSent = true;
-        }
-
         persistLocation(location);
         if (this.isNetworkConnected()) {
             Log.d(TAG, "Scheduling location network post");
             schedulePostLocations();
         } else {
             Log.d(TAG, "Network unavailable, waiting for now");
+        }
+        if(!this.firstUpdateSent){
+            this.requestUpdates(this.distanceFilter, locationTimeout * 1000);
+            this.firstUpdateSent = true;
         }
     }
 
