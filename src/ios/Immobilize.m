@@ -8,7 +8,7 @@
 
 
 @implementation Immobilize {
-    BOOL isDebugging;
+
     BOOL enabled;
     BOOL isUpdatingLocation;
     BOOL isWatchingLocation;
@@ -28,7 +28,7 @@
     
     NSNumber *maxBackgroundHours;
     CLLocationManager *locationManager;
-    UILocalNotification *localNotification;
+
     
     CDVLocationData *locationData;
     CLLocation *lastLocation;
@@ -69,15 +69,13 @@
     locationManager = [[CLLocationManager alloc] init];
     locationManager.delegate = self;
     
-    localNotification = [[UILocalNotification alloc] init];
-    localNotification.timeZone = [NSTimeZone defaultTimeZone];
+
     
     locationQueue = [[NSMutableArray alloc] init];
     
     isMoving = NO;
     isUpdatingLocation = NO;
     stopOnTerminate = NO;
-    isDebugging = YES;
     isUpdateEnabled = NO;
     isWatchEnabled = NO;
     immobilizeReported = NO;
@@ -156,10 +154,7 @@
     // Sanity-check the duration of last bgTask:  If greater than 30s, kill it.
     if (bgTask != UIBackgroundTaskInvalid) {
         if (-[lastBgTaskAt timeIntervalSinceNow] > 30.0) {
-            NSLog(@"- Immobilize#flushQueue has to kill an out-standing background-task!");
-            if (isDebugging) {
-                [self notify:@"Outstanding bg-task was force-killed"];
-            }
+            NSLog(@"- Immobilize#flushQueue has to kill an out-standing background-task.");
             [self stopBackgroundTask];
         }
         return;
@@ -603,9 +598,6 @@
 - (void) locationManager:(CLLocationManager *)manager didChangeAuthorizationStatus:(CLAuthorizationStatus)status
 {
     NSLog(@"- Immobilize didChangeAuthorizationStatus %u", status);
-    if (isDebugging) {
-        [self notify:[NSString stringWithFormat:@"Authorization status changed %u", status]];
-    }
 }
 
 - (NSTimeInterval) locationAge:(CLLocation*)location
@@ -613,12 +605,6 @@
     return -[location.timestamp timeIntervalSinceNow];
 }
 
-- (void) notify:(NSString*)message
-{
-    localNotification.fireDate = [NSDate date];
-    localNotification.alertBody = message;
-    [[UIApplication sharedApplication] scheduleLocalNotification:localNotification];
-}
 /**
  * If you don't stopMonitoring when application terminates, the app will be awoken still when a
  * new location arrives, essentially monitoring the user's location even when they've killed the app.
